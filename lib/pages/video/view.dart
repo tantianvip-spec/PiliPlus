@@ -404,8 +404,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       return;
     }
 
-    // Hide mini-player when returning to video page
-    if (MiniPlayerController.instance.isVisible.value) {
+    // Hide mini-player when returning to video page.
+    // Must read isVisible BEFORE hide(), because hide() sets it to false.
+    final returnedFromMiniPlayer = MiniPlayerController.instance.isVisible.value;
+    if (returnedFromMiniPlayer) {
       MiniPlayerController.instance.hide();
     }
 
@@ -444,14 +446,19 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     plPlayerController
       ?..addStatusLister(playerListener)
       ..addPositionListener(positionListener);
-    if (videoDetailController.autoPlay) {
-      videoDetailController.playerInit(
-        autoplay: videoDetailController.playerStatus?.isPlaying ?? false,
-      );
-    } else if (videoDetailController.plPlayerController.preInitPlayer &&
-        !videoDetailController.isQuerying &&
-        videoDetailController.videoUrl != null) {
-      videoDetailController.playerInit();
+    // When returning from mini-player, the player is already running.
+    // Do NOT call playerInit() — it would reopen the media stream and
+    // disconnect the video surface, causing black screen + audio only.
+    if (!returnedFromMiniPlayer) {
+      if (videoDetailController.autoPlay) {
+        videoDetailController.playerInit(
+          autoplay: videoDetailController.playerStatus?.isPlaying ?? false,
+        );
+      } else if (videoDetailController.plPlayerController.preInitPlayer &&
+          !videoDetailController.isQuerying &&
+          videoDetailController.videoUrl != null) {
+        videoDetailController.playerInit();
+      }
     }
   }
 
