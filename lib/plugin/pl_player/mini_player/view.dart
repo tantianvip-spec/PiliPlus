@@ -106,12 +106,14 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     final plCtr = widget.plCtr;
     final heroTag = _findHeroTag();
     widget.ctrl.hide();
-    if (plCtr.bvid.isNotEmpty && heroTag != null) {
+    final bvid = plCtr.bvid;
+    final cid = plCtr.cid;
+    if (bvid.isNotEmpty && cid != null && heroTag != null) {
       Get.toNamed(
         '/videoV',
         arguments: {
-          'bvid': plCtr.bvid,
-          'cid': plCtr.cid,
+          'bvid': bvid,
+          'cid': cid,
           'heroTag': heroTag,
           'videoType': VideoType.ugc,
         },
@@ -269,42 +271,29 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 ),
               ),
 
-              // Resize handle at bottom-right
+              // Resize handle at bottom-right — GestureDetector blocks drag below it
               Positioned(
                 right: 0,
                 bottom: 0,
-                child: Listener(
-                  behavior: HitTestBehavior.translucent,
-                  onPointerDown: (event) {
-                    _resizePointer = event.pointer;
-                    _resizeStartPos = event.position;
+                child: GestureDetector(
+                  onPanStart: (details) {
+                    _resizeStartPos = details.localPosition;
                     _resizeStartSize = widget.ctrl.size.value;
                   },
-                  onPointerMove: (event) {
-                    if (event.pointer == _resizePointer &&
-                        _resizeStartPos != null &&
-                        _resizeStartSize != null) {
+                  onPanUpdate: (details) {
+                    if (_resizeStartPos != null && _resizeStartSize != null) {
                       final ctrl = widget.ctrl;
-                      final delta = event.position - _resizeStartPos!;
+                      final delta = details.delta;
                       final newWidth =
                           (_resizeStartSize!.width + delta.dx).clamp(120.0, widget.screenSize.width * 0.85);
                       final aspect = _resizeStartSize!.width / _resizeStartSize!.height;
                       ctrl.updateSize(Size(newWidth, newWidth / aspect));
+                      _resizeStartSize = ctrl.size.value;
                     }
                   },
-                  onPointerUp: (event) {
-                    if (event.pointer == _resizePointer) {
-                      _resizePointer = null;
-                      _resizeStartPos = null;
-                      _resizeStartSize = null;
-                    }
-                  },
-                  onPointerCancel: (event) {
-                    if (event.pointer == _resizePointer) {
-                      _resizePointer = null;
-                      _resizeStartPos = null;
-                      _resizeStartSize = null;
-                    }
+                  onPanEnd: (details) {
+                    _resizeStartPos = null;
+                    _resizeStartSize = null;
                   },
                   child: Container(
                     width: 28,
