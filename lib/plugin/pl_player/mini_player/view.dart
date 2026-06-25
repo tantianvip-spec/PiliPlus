@@ -69,9 +69,13 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   late final Animation<Offset> _slideAnimation;
   late final Animation<double> _fadeAnimation;
 
-  // Track initial values for scale gesture
-  Offset? _initialPosition;
-  Size? _initialSize;
+  // Track drag position
+  Offset? _dragStartPosition;
+  Offset? _dragStartFocalPoint;
+
+  // Track pinch
+  Size? _pinchStartSize;
+  double? _pinchStartScale;
 
   @override
   void initState() {
@@ -104,49 +108,54 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     super.dispose();
   }
 
-  /// Unified gesture handler: single finger drags, two+ fingers pinch-zoom.
-  void _onScaleStart(ScaleStartDetails details) {
-    _initialPosition = widget.ctrl.position.value;
-    _initialSize = widget.ctrl.size.value;
+  // ---- Drag (pan) handling on the gesture overlay ----
+
+  void _onPanStart(DragStartDetails details) {
+    _dragStartPosition = widget.ctrl.position.value;
+    _dragStartFocalPoint = details.localPosition;
   }
 
-  void _onScaleUpdate(ScaleUpdateDetails details) {
+  void _onPanUpdate(DragUpdateDetails details) {
     final ctrl = widget.ctrl;
-
-    if (details.pointerCount >= 2) {
-      // Pinch-to-zoom: resize the mini-player
-      final currentSize = _initialSize ?? ctrl.size.value;
-      final newSize = ctrl.clampSize(
-        Size(
-          currentSize.width * details.scale,
-          currentSize.height * details.scale,
-        ),
-        widget.screenSize,
-      );
-      ctrl.updateSize(newSize);
-
-      // Keep position in bounds after resize
-      final pos = ctrl.position.value;
-      ctrl.updatePosition(ctrl.clampPosition(pos, newSize, widget.screenSize));
-    } else {
-      // Single finger drag: move position
-      final start = _initialPosition ?? ctrl.position.value;
-      final playerSize = ctrl.size.value;
-      ctrl.updatePosition(ctrl.clampPosition(
-        Offset(
-          start.dx - details.focalPointDelta.dx,
-          start.dy - details.focalPointDelta.dy,
-        ),
-        playerSize,
-        widget.screenSize,
-      ));
-    }
+    final start = _dragStartPosition ?? ctrl.position.value;
+    final playerSize = ctrl.size.value;
+    ctrl.updatePosition(ctrl.clampPosition(
+      Offset(
+        start.dx - details.delta.dx,
+        start.dy - details.delta.dy,
+      ),
+      playerSize,
+      widget.screenSize,
+    ));
   }
 
-  void _onScaleEnd(ScaleEndDetails details) {
-    _initialPosition = null;
-    _initialSize = null;
+  void _onPanEnd(DragEndDetails details) {
+    _dragStartPosition = null;
+    _dragStartFocalPoint = null;
   }
+
+  // ---- Resize via dedicated bottom-right handle ----
+
+  void _onResizeStart(DragStartDetails details) {
+    _pinchStartSize = widget.ctrl.size.value;
+  }
+
+  void _onResizeUpdate(DragUpdateDetails details) {
+    final ctrl = widget.ctrl;
+    final currentSize = _pinchStartSize ?? ctrl.size.value;
+    // Drag down-right = grow; delta.dx is positive to the right
+    final double newWidth = (currentSize.width + details.delta.dx)
+        .clamp(120.0, widget.screenSize.width * 0.85);
+    final double aspect = currentSize.width / currentSize.height;
+    ctrl.updateSize(Size(newWidth, newWidth / aspect));
+    _pinchStartSize = ctrl.size.value; // update for next frame
+  }
+
+  void _onResizeEnd(DragEndDetails details) {
+    _pinchStartSize = null;
+  }
+
+  // ---- Tap to expand ----
 
   void _onTap() {
     final plCtr = widget.plCtr;
@@ -169,7 +178,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
   String? _findHeroTag() {
     try {
-      // Attempt to find a reasonable heroTag from current route arguments
       final args = Get.arguments;
       if (args is Map && args['heroTag'] != null) {
         return args['heroTag'] as String;
@@ -190,109 +198,117 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
           elevation: 8,
           borderRadius: BorderRadius.circular(12),
           clipBehavior: Clip.antiAlias,
-          child: GestureDetector(
-            onScaleStart: _onScaleStart,
-            onScaleUpdate: _onScaleUpdate,
-            onScaleEnd: _onScaleEnd,
-            onTap: _onTap,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Video content
-                if (plCtr.videoController != null)
-                  SimpleVideo(
-                    controller: plCtr.videoController!,
-                    fill: Colors.black,
-                  )
-                else
-                  Container(color: Colors.black),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Layer 1: Video content
+              if (plCtr.videoController != null)
+                SimpleVideo(
+                  controller: plCtr.videoController!,
+                  fill: Colors.black,
+                )
+              else
+                Container(color: Colors.black),
 
-                // Bottom control bar
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    height: 36,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        // Play/Pause
-                        _ControlButton(
-                          icon: Obx(() {
-                            final isPlaying =
-                                plCtr.playerStatus.isPlaying;
-                            return Icon(
-                              isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              size: 18,
-                              color: Colors.white,
-                            );
-                          }),
-                          onTap: () {
-                            if (plCtr.playerStatus.isPlaying) {
-                              plCtr.pause();
-                            } else {
-                              plCtr.play();
-                            }
-                          },
-                        ),
+              // Layer 2: Gesture overlay for drag + tap
+              // Sits above video but BELOW controls in stacking order
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: _onTap,
+                  onPanStart: _onPanStart,
+                  onPanUpdate: _onPanUpdate,
+                  onPanEnd: _onPanEnd,
+                ),
+              ),
 
-                        // Progress
-                        Expanded(
-                          child: Obx(() {
-                            final position = plCtr.positionSeconds.value;
-                            final duration =
-                                plCtr.duration.value.inSeconds;
-                            return ProgressBar(
-                              progress: Duration(seconds: position),
-                              total: Duration(seconds: duration),
-                              barHeight: 2.5,
-                              baseBarColor: const Color(0x33FFFFFF),
-                              progressBarColor: Colors.white,
-                              bufferedBarColor: const Color(0x55FFFFFF),
-                              thumbRadius: 0,
-                              thumbColor: Colors.white,
-                              thumbGlowColor: Colors.white,
-                              thumbGlowRadius: 0,
-                              onSeek: plCtr.seekTo,
-                            );
-                          }),
-                        ),
-
-                        // Close
-                        _ControlButton(
-                          icon: const Icon(
-                            Icons.close_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          onTap: widget.ctrl.close,
-                        ),
+              // Layer 3: Bottom control bar (on top, catches its own events)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.7),
                       ],
                     ),
                   ),
-                ),
+                  child: Row(
+                    children: [
+                      // Play/Pause
+                      _ControlButton(
+                        icon: Obx(() {
+                          final isPlaying = plCtr.playerStatus.isPlaying;
+                          return Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 20,
+                            color: Colors.white,
+                          );
+                        }),
+                        onTap: () {
+                          if (plCtr.playerStatus.isPlaying) {
+                            plCtr.pause();
+                          } else {
+                            plCtr.play();
+                          }
+                        },
+                      ),
 
-                // Resize handle indicator at bottom-right corner
-                Positioned(
-                  right: 0,
-                  bottom: 0,
+                      // Progress
+                      Expanded(
+                        child: Obx(() {
+                          final position = plCtr.positionSeconds.value;
+                          final duration = plCtr.duration.value.inSeconds;
+                          return ProgressBar(
+                            progress: Duration(seconds: position),
+                            total: Duration(seconds: duration),
+                            barHeight: 3,
+                            baseBarColor: const Color(0x33FFFFFF),
+                            progressBarColor: Colors.white,
+                            bufferedBarColor: const Color(0x55FFFFFF),
+                            thumbRadius: 0,
+                            thumbColor: Colors.white,
+                            thumbGlowColor: Colors.white,
+                            thumbGlowRadius: 0,
+                            onSeek: plCtr.seekTo,
+                          );
+                        }),
+                      ),
+
+                      // Close
+                      _ControlButton(
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          size: 20,
+                          color: Colors.white,
+                        ),
+                        onTap: widget.ctrl.close,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Layer 4: Resize handle at bottom-right corner
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onPanStart: _onResizeStart,
+                  onPanUpdate: _onResizeUpdate,
+                  onPanEnd: _onResizeEnd,
                   child: Container(
-                    width: 24,
-                    height: 24,
+                    width: 28,
+                    height: 28,
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
+                      color: Colors.black.withValues(alpha: 0.4),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(8),
                         bottomRight: Radius.circular(12),
@@ -301,13 +317,13 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     alignment: Alignment.center,
                     child: Icon(
                       Icons.fit_screen_rounded,
-                      size: 14,
-                      color: Colors.white.withValues(alpha: 0.8),
+                      size: 16,
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -327,16 +343,16 @@ class _ControlButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 32,
-      height: 36,
+      width: 44,
+      height: 40,
       child: IconButton(
         onPressed: onTap,
         icon: icon,
         style: IconButton.styleFrom(
           padding: EdgeInsets.zero,
           foregroundColor: Colors.white,
-          visualDensity: VisualDensity.compact,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.standard,
+          tapTargetSize: MaterialTapTargetSize.padded,
         ),
       ),
     );
