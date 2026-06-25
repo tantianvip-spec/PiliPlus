@@ -40,6 +40,7 @@ import 'package:PiliPlus/pages/video/reply/view.dart';
 import 'package:PiliPlus/pages/video/view_point/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
 import 'package:PiliPlus/pages/video/widgets/player_focus.dart';
+import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/fullscreen_mode.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_repeat.dart';
@@ -381,8 +382,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       videoDetailController.makeHeartBeat();
       plPlayerController!
         ..removeStatusLister(playerListener)
-        ..removePositionListener(positionListener)
-        ..pause();
+        ..removePositionListener(positionListener);
+      if (plPlayerController!.playerStatus.isPlaying) {
+        // Navigated away while playing → show mini-player
+        MiniPlayerController.instance.show();
+      } else {
+        plPlayerController!.pause();
+      }
     }
   }
 

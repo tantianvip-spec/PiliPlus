@@ -35,6 +35,7 @@ import 'package:PiliPlus/pages/video/introduction/pgc/controller.dart';
 import 'package:PiliPlus/pages/video/post_panel/popup_menu_text.dart';
 import 'package:PiliPlus/pages/video/post_panel/view.dart';
 import 'package:PiliPlus/pages/video/widgets/header_control.dart';
+import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/models/bottom_control_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/data_status.dart';
@@ -893,6 +894,22 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           inAppFullScreen: true,
         ),
       ),
+
+      /// 最小化到小窗
+      BottomControlType.minimize => ComBtn(
+        width: widgetWidth,
+        height: 30,
+        tooltip: '小窗播放',
+        icon: const Icon(
+          Icons.picture_in_picture_alt,
+          size: 20,
+          color: Colors.white,
+        ),
+        onTap: () {
+          MiniPlayerController.instance.show();
+          Get.back();
+        },
+      ),
     };
 
     final isNotFileSource = !plPlayerController.isFileSource;
@@ -916,6 +933,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       .speed,
       if (isNotFileSource && flag) .qa,
       if (!plPlayerController.isDesktopPip) .fullscreen,
+      if (!plPlayerController.isDesktopPip &&
+          PlatformUtils.isMobile &&
+          !isFullScreen)
+        BottomControlType.minimize,
     ];
     return PlayerBar(
       children: [

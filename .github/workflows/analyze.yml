@@ -1,0 +1,85 @@
+name: Analyze & Verify
+
+on:
+    pull_request:
+        types:
+            - opened
+            - synchronize
+            - reopened
+        paths-ignore:
+            - "**.md"
+    push:
+        branches: [main]
+        paths-ignore:
+            - "**.md"
+    workflow_dispatch:
+
+jobs:
+    analyze:
+        name: Dart Analyze
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: 代码迁出
+              uses: actions/checkout@v7
+
+            - name: 安装Flutter
+              uses: subosito/flutter-action@v2
+              id: flutter-action
+              with:
+                  channel: stable
+                  flutter-version-file: pubspec.yaml
+                  cache: true
+
+            - name: 获取依赖
+              run: flutter pub get
+
+            - name: 静态分析（全部）
+              run: flutter analyze --fatal-infos 2>&1 | tail -50
+
+    test:
+        name: Run Tests
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: 代码迁出
+              uses: actions/checkout@v7
+
+            - name: 安装Flutter
+              uses: subosito/flutter-action@v2
+              id: flutter-action
+              with:
+                  channel: stable
+                  flutter-version-file: pubspec.yaml
+                  cache: true
+
+            - name: 获取依赖
+              run: flutter pub get
+
+            - name: 运行测试
+              run: flutter test 2>&1 | tail -50
+
+    analyze_mini_player:
+        name: Mini-Player Analysis
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: 代码迁出
+              uses: actions/checkout@v7
+
+            - name: 安装Flutter
+              uses: subosito/flutter-action@v2
+              id: flutter-action
+              with:
+                  channel: stable
+                  flutter-version-file: pubspec.yaml
+                  cache: true
+
+            - name: 获取依赖
+              run: flutter pub get
+
+            - name: 分析 mini_player 模块
+              run: dart analyze lib/plugin/pl_player/mini_player/ lib/plugin/pl_player/controller.dart 2>&1
+
+            - name: 分析 main/view.dart 和 video/view.dart
+              run: dart analyze lib/pages/main/view.dart lib/pages/video/view.dart 2>&1
