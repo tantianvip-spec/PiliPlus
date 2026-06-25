@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:get/get.dart';
 
