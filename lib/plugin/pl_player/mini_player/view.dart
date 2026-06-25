@@ -206,11 +206,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 else
                   Container(color: Colors.black),
 
-                // Tap to expand overlay
+                // Tap to expand overlay (opaque: don't steal taps from controls above)
                 Positioned.fill(
                   child: GestureDetector(
                     onTap: _onTap,
-                    behavior: HitTestBehavior.translucent,
+                    behavior: HitTestBehavior.opaque,
                   ),
                 ),
 

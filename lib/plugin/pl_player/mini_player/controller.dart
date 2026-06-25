@@ -28,27 +28,32 @@ class MiniPlayerController extends GetxController {
   void show() {
     final ctr = PlPlayerController.instance;
     if (ctr != null && ctr.isDesktopPip) return;
+    debugPrint('[MiniPlayer] show() called, wasVisible=${isVisible.value}');
     isVisible.value = true;
   }
 
   /// Hide the mini-player overlay without stopping playback.
   void hide() {
+    debugPrint('[MiniPlayer] hide() called, wasVisible=${isVisible.value}');
     isVisible.value = false;
   }
 
   /// Close the mini-player and dispose the player.
   void close() {
+    debugPrint('[MiniPlayer] close() called');
     hide();
     PlPlayerController.instance?.dispose();
   }
 
   /// Update the drag position.
   void updatePosition(Offset pos) {
+    debugPrint('[MiniPlayer] updatePosition($pos)');
     position.value = pos;
   }
 
   /// Update the mini-player size.
   void updateSize(Size newSize) {
+    debugPrint('[MiniPlayer] updateSize($newSize)');
     size.value = newSize;
   }
 
