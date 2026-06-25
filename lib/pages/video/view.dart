@@ -349,7 +349,10 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       videoPlayerServiceHandler?.onVideoDetailDispose(heroTag);
       if (plPlayerController != null) {
         videoDetailController.makeHeartBeat();
-        plPlayerController!.dispose();
+        // Don't dispose if mini-player is showing — it needs the player
+        if (!MiniPlayerController.instance.isVisible.value) {
+          plPlayerController!.dispose();
+        }
       } else {
         PlPlayerController.updatePlayCount();
       }
