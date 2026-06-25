@@ -449,7 +449,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     // When returning from mini-player, the player is already running.
     // Do NOT call playerInit() — it would reopen the media stream and
     // disconnect the video surface, causing black screen + audio only.
-    if (!returnedFromMiniPlayer) {
+    // Instead, restore videoState so PLVideoPlayer re-renders.
+    if (returnedFromMiniPlayer) {
+      videoDetailController.videoState.value = true;
+      videoDetailController.refreshPage();
+    } else {
       if (videoDetailController.autoPlay) {
         videoDetailController.playerInit(
           autoplay: videoDetailController.playerStatus?.isPlaying ?? false,
