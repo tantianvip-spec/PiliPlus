@@ -12,26 +12,27 @@ import 'package:media_kit_video/media_kit_video.dart';
 ///
 /// Renders a draggable, resizable video player with basic controls
 /// that floats over other pages within the app.
-class MiniPlayerWidget extends GetView<MiniPlayerController> {
+class MiniPlayerWidget extends StatelessWidget {
   const MiniPlayerWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final ctrl = MiniPlayerController.instance;
     final screenSize = MediaQuery.sizeOf(context);
 
     return Obx(() {
-      if (!controller.isVisible.value) return const SizedBox.shrink();
+      if (!ctrl.isVisible.value) return const SizedBox.shrink();
 
-      final ctr = PlPlayerController.instance;
-      if (ctr == null) return const SizedBox.shrink();
+      final plCtr = PlPlayerController.instance;
+      if (plCtr == null) return const SizedBox.shrink();
 
       // Initialize size on first show
-      controller.initSize(screenSize);
+      ctrl.initSize(screenSize);
 
-      final offset = controller.position.value;
+      final offset = ctrl.position.value;
       final right = offset.dx;
       final bottom = offset.dy;
-      final playerSize = controller.size.value;
+      final playerSize = ctrl.size.value;
 
       return Positioned(
         right: right,
@@ -40,8 +41,8 @@ class MiniPlayerWidget extends GetView<MiniPlayerController> {
         height: playerSize.height,
         child: _MiniPlayerContent(
           screenSize: screenSize,
-          controller: controller,
-          playerController: ctr,
+          ctrl: ctrl,
+          plCtr: plCtr,
         ),
       );
     });
@@ -50,13 +51,13 @@ class MiniPlayerWidget extends GetView<MiniPlayerController> {
 
 class _MiniPlayerContent extends StatefulWidget {
   final Size screenSize;
-  final MiniPlayerController controller;
-  final PlPlayerController playerController;
+  final MiniPlayerController ctrl;
+  final PlPlayerController plCtr;
 
   const _MiniPlayerContent({
     required this.screenSize,
-    required this.controller,
-    required this.playerController,
+    required this.ctrl,
+    required this.plCtr,
   });
 
   @override
@@ -106,12 +107,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
   /// Unified gesture handler: single finger drags, two+ fingers pinch-zoom.
   void _onScaleStart(ScaleStartDetails details) {
-    _initialPosition = widget.controller.position.value;
-    _initialSize = widget.controller.size.value;
+    _initialPosition = widget.ctrl.position.value;
+    _initialSize = widget.ctrl.size.value;
   }
 
   void _onScaleUpdate(ScaleUpdateDetails details) {
-    final ctrl = widget.controller;
+    final ctrl = widget.ctrl;
 
     if (details.pointerCount >= 2) {
       // Pinch-to-zoom: resize the mini-player
@@ -149,9 +150,9 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   }
 
   void _onTap() {
-    final plCtr = widget.playerController;
+    final plCtr = widget.plCtr;
     final heroTag = _findHeroTag();
-    widget.controller.hide();
+    widget.ctrl.hide();
     if (plCtr.bvid.isNotEmpty && heroTag != null) {
       Get.toNamed(
         '/videoV',
@@ -180,7 +181,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
   @override
   Widget build(BuildContext context) {
-    final plCtr = widget.playerController;
+    final plCtr = widget.plCtr;
 
     return SlideTransition(
       position: _slideAnimation,
@@ -272,9 +273,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                               thumbColor: Colors.white,
                               thumbGlowColor: Colors.white,
                               thumbGlowRadius: 0,
-                              onSeek: (value) {
-                                plCtr.seekTo(value);
-                              },
+                              onSeek: plCtr.seekTo,
                             );
                           }),
                         ),
@@ -286,7 +285,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                             size: 18,
                             color: Colors.white,
                           ),
-                          onTap: widget.controller.close,
+                          onTap: widget.ctrl.close,
                         ),
                       ],
                     ),

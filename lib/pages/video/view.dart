@@ -401,6 +401,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       return;
     }
 
+    // Hide mini-player when returning to video page
+    if (MiniPlayerController.instance.isVisible.value) {
+      MiniPlayerController.instance.hide();
+    }
+
     isShowing = true;
 
     addObserverMobile(this);

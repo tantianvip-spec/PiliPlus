@@ -1,15 +1,17 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
-import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:get/get.dart';
 
 /// Controller for the in-app mini-player overlay.
 ///
-/// Manages visibility, position, and routing logic for the floating
+/// Manages visibility, position, and sizing logic for the floating
 /// mini-player that appears when users navigate away from the video
 /// detail page while a video is playing.
+///
+/// Triggered either automatically (on navigate away while playing)
+/// or manually (via the minimize button in player controls).
+/// Auto-hide is handled by the video page's RouteAware lifecycle.
 class MiniPlayerController extends GetxController {
   static MiniPlayerController get instance => Get.find<MiniPlayerController>();
 
@@ -21,45 +23,6 @@ class MiniPlayerController extends GetxController {
 
   /// Current size of the mini-player. Initialized on first show.
   final Rx<Size> size = Size.zero.obs;
-
-  StreamSubscription<String>? _routeSub;
-
-  @override
-  void onInit() {
-    super.onInit();
-    _routeSub = Get.routing.current.listen(_onRouteChanged);
-  }
-
-  @override
-  void onClose() {
-    _routeSub?.cancel();
-    _routeSub = null;
-    super.onClose();
-  }
-
-  void _onRouteChanged(String routeName) {
-    if (_isVideoPage(routeName)) {
-      if (isVisible.value) {
-        hide();
-      }
-    } else {
-      _checkAutoShow();
-    }
-  }
-
-  bool _isVideoPage(String routeName) {
-    return routeName == '/videoV' || routeName == '/liveRoom';
-  }
-
-  void _checkAutoShow() {
-    if (isVisible.value) return;
-    if (!PlPlayerController.instanceExists()) return;
-    final ctr = PlPlayerController.instance;
-    if (ctr == null) return;
-    if (ctr.playerStatus.isPlaying || ctr.playerStatus.isPaused) {
-      show();
-    }
-  }
 
   /// Show the mini-player overlay.
   void show() {
@@ -113,7 +76,7 @@ class MiniPlayerController extends GetxController {
 
   /// Clamp size within min/max bounds.
   Size clampSize(Size newSize, Size screenSize) {
-    final double minW = 120.0;
+    const double minW = 120.0;
     final double maxW = screenSize.width * 0.5;
     final double minH = minW * 9 / 16;
     final double maxH = maxW * 9 / 16;
