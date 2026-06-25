@@ -15,28 +15,6 @@ on:
     workflow_dispatch:
 
 jobs:
-    analyze:
-        name: Dart Analyze
-        runs-on: ubuntu-latest
-
-        steps:
-            - name: 代码迁出
-              uses: actions/checkout@v7
-
-            - name: 安装Flutter
-              uses: subosito/flutter-action@v2
-              id: flutter-action
-              with:
-                  channel: stable
-                  flutter-version-file: pubspec.yaml
-                  cache: true
-
-            - name: 获取依赖
-              run: flutter pub get
-
-            - name: 静态分析（全部）
-              run: flutter analyze 2>&1
-
     test:
         name: Run Tests
         runs-on: ubuntu-latest
@@ -80,6 +58,3 @@ jobs:
 
             - name: 分析 mini_player 模块
               run: flutter analyze lib/plugin/pl_player/mini_player/ lib/plugin/pl_player/controller.dart lib/pages/main/view.dart lib/pages/video/view.dart 2>&1
-
-            - name: 分析 main/view.dart 和 video/view.dart
-              run: echo "已合并到上一分析步骤"
