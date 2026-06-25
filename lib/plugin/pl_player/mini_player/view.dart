@@ -270,7 +270,8 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                               bufferedBarColor: const Color(0x55FFFFFF),
                               thumbRadius: 0,
                               thumbColor: Colors.white,
-                              timeLabelLocation: TimeLabelLocation.none,
+                              thumbGlowColor: Colors.white,
+                              thumbGlowRadius: 0,
                               onSeek: (value) {
                                 plCtr.seekTo(value);
                               },
@@ -308,7 +309,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     ),
                     alignment: Alignment.center,
                     child: Icon(
-                      Icons.resize_rounded,
+                      Icons.fit_screen_rounded,
                       size: 14,
                       color: Colors.white.withValues(alpha: 0.8),
                     ),

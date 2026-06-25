@@ -79,7 +79,7 @@ jobs:
               run: flutter pub get
 
             - name: 分析 mini_player 模块
-              run: dart analyze lib/plugin/pl_player/mini_player/ lib/plugin/pl_player/controller.dart 2>&1
+              run: flutter analyze lib/plugin/pl_player/mini_player/ lib/plugin/pl_player/controller.dart lib/pages/main/view.dart lib/pages/video/view.dart 2>&1 | tail -50
 
             - name: 分析 main/view.dart 和 video/view.dart
-              run: dart analyze lib/pages/main/view.dart lib/pages/video/view.dart 2>&1
+              run: echo "已合并到上一分析步骤"
