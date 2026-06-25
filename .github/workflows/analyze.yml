@@ -35,7 +35,7 @@ jobs:
               run: flutter pub get
 
             - name: 静态分析（全部）
-              run: flutter analyze --fatal-infos 2>&1 | tail -50
+              run: flutter analyze --fatal-infos 2>&1
 
     test:
         name: Run Tests
@@ -79,7 +79,7 @@ jobs:
               run: flutter pub get
 
             - name: 分析 mini_player 模块
-              run: flutter analyze lib/plugin/pl_player/mini_player/ lib/plugin/pl_player/controller.dart lib/pages/main/view.dart lib/pages/video/view.dart 2>&1 | tail -50
+              run: flutter analyze lib/plugin/pl_player/mini_player/ lib/plugin/pl_player/controller.dart lib/pages/main/view.dart lib/pages/video/view.dart 2>&1
 
             - name: 分析 main/view.dart 和 video/view.dart
               run: echo "已合并到上一分析步骤"
