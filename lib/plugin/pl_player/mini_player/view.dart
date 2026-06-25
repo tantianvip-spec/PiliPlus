@@ -155,17 +155,10 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               else
                 Container(color: Colors.black),
 
-              // Tap-to-expand overlay (catches taps only)
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: _onTap,
-                  behavior: HitTestBehavior.translucent,
-                ),
-              ),
-
-              // Drag listener — uses raw pointer events, doesn't compete with gestures
+              // Drag + tap handler — uses raw pointer events, no gesture arena conflict
               Positioned.fill(
                 child: Listener(
+                  behavior: HitTestBehavior.translucent,
                   onPointerDown: (event) {
                     if (_dragPointer == null) {
                       _dragPointer = event.pointer;
@@ -192,6 +185,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                   },
                   onPointerUp: (event) {
                     if (event.pointer == _dragPointer) {
+                      // Detect tap: if moved less than 5px, treat as tap
+                      if (_dragPointerStart != null &&
+                          (event.position - _dragPointerStart!).distance < 5) {
+                        _onTap();
+                      }
                       _dragPointer = null;
                       _dragStartPos = null;
                       _dragPointerStart = null;
