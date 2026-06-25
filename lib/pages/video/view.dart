@@ -450,9 +450,17 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     // Do NOT call playerInit() — it would reopen the media stream and
     // disconnect the video surface, causing black screen + audio only.
     // Instead, restore videoState so PLVideoPlayer re-renders.
+    // IMPORTANT: Defer videoState to the next frame so the mini-player's
+    // SimpleVideo is fully removed from the widget tree first. Having
+    // two SimpleVideo widgets bound to the same VideoController at once
+    // causes a media-kit crash.
     if (returnedFromMiniPlayer) {
-      videoDetailController.videoState.value = true;
-      videoDetailController.refreshPage();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          videoDetailController.videoState.value = true;
+          videoDetailController.refreshPage();
+        }
+      });
     } else {
       if (videoDetailController.autoPlay) {
         videoDetailController.playerInit(

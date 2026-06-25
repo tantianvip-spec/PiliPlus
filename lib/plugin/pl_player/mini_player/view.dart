@@ -100,10 +100,9 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   }
 
   void _onTap() {
-    widget.ctrl.hide();
-    // Pop back to the video page that's already in the navigation stack.
-    // We never create a new route — the video page was pushed before
-    // we navigated away, so it's still in the stack underneath.
+    // Do NOT call hide() here — didPopNext on the video page needs
+    // isVisible to still be true so it can skip playerInit and
+    // restore videoState. hide() is called inside didPopNext.
     Get.key.currentState?.popUntil((route) => route.settings.name == '/videoV');
   }
 
