@@ -405,10 +405,15 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     }
 
     // Hide mini-player when returning to video page.
-    // Must read isVisible BEFORE hide(), because hide() sets it to false.
-    final returnedFromMiniPlayer = MiniPlayerController.instance.isVisible.value;
+    // Use the tap-to-expand flag (decoupled from isVisible timing)
+    // so we can detect mini-player return even after hide() already ran.
+    final miniPlayerCtrl = MiniPlayerController.instance;
+    final returnedFromMiniPlayer = miniPlayerCtrl.tapToExpandTriggered;
     if (returnedFromMiniPlayer) {
-      MiniPlayerController.instance.hide();
+      miniPlayerCtrl.clearTapToExpand();
+      if (miniPlayerCtrl.isVisible.value) {
+        miniPlayerCtrl.hide();
+      }
     }
 
     isShowing = true;

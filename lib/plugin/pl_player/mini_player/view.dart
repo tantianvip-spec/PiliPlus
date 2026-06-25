@@ -100,9 +100,14 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   }
 
   void _onTap() {
-    // Do NOT call hide() here — didPopNext on the video page needs
-    // isVisible to still be true so it can skip playerInit and
-    // restore videoState. hide() is called inside didPopNext.
+    final ctrl = widget.ctrl;
+    // 1. Set flag BEFORE hide() so didPopNext can detect tap-to-expand
+    //    even after isVisible is already false.
+    ctrl.markTapToExpand();
+    // 2. Hide mini-player immediately to remove its SimpleVideo from
+    //    the widget tree before popUntil triggers didPopNext.
+    ctrl.hide();
+    // 3. Navigate back to the video page.
     Get.key.currentState?.popUntil((route) => route.settings.name == '/videoV');
   }
 
