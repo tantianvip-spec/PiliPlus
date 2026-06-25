@@ -1,0 +1,72 @@
+name: Build Test APK
+
+on:
+    workflow_dispatch:
+        inputs:
+            build_type:
+                description: "构建类型"
+                required: false
+                default: "debug"
+                type: choice
+                options:
+                    - debug
+                    - release
+
+jobs:
+    build_apk:
+        name: Build APK
+        runs-on: ubuntu-latest
+        permissions: write-all
+
+        steps:
+            - name: 代码迁出
+              uses: actions/checkout@v7
+              with:
+                  fetch-depth: 0
+
+            - name: 构建Java环境
+              uses: actions/setup-java@v5
+              with:
+                  distribution: "zulu"
+                  java-version: "17"
+                  cache: "gradle"
+                  cache-dependency-path: |
+                      android/*.gradle*
+                      android/**/gradle-wrapper.properties
+
+            - name: 安装Flutter
+              uses: subosito/flutter-action@v2
+              id: flutter-action
+              with:
+                  channel: stable
+                  flutter-version-file: pubspec.yaml
+                  cache: true
+
+            - name: Apply Patch
+              shell: pwsh
+              run: lib/scripts/patch.ps1 android
+
+            - name: 构建 Debug APK
+              if: github.event.inputs.build_type == 'debug'
+              run: |
+                  flutter build apk --debug --split-per-abi --pub
+
+            - name: 构建 Release APK（未签名）
+              if: github.event.inputs.build_type == 'release'
+              run: |
+                  flutter build apk --release --split-per-abi --android-project-arg dev=1 --pub
+
+            - name: 重命名 APK
+              run: |
+                  for file in build/app/outputs/flutter-apk/app-*-debug.apk build/app/outputs/flutter-apk/app-*-release.apk; do
+                    if [ -f "$file" ]; then
+                      abi=$(echo "$file" | sed -E 's|.*app-(.*)-debug\.apk|\1|; s|.*app-(.*)-release\.apk|\1|')
+                      mv "$file" "PiliPlus_test_${abi}.apk"
+                    fi
+                  done
+
+            - name: 上传 APK
+              uses: actions/upload-artifact@v7
+              with:
+                  name: PiliPlus-Test-APK
+                  path: PiliPlus_test_*.apk
