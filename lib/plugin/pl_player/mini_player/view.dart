@@ -1,7 +1,6 @@
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
-import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -65,14 +64,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   late final Animation<Offset> _slideAnimation;
   late final Animation<double> _fadeAnimation;
 
-  // Drag tracking via raw pointer events
-  int? _dragPointer;
+  // Drag tracking
   Offset? _dragStartPos;
   Offset? _dragPointerStart;
 
   // Resize tracking
-  int? _resizePointer;
-  Offset? _resizeStartPos;
+  Offset? _resizePointerStart;
   Size? _resizeStartSize;
 
   @override
@@ -103,34 +100,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   }
 
   void _onTap() {
-    final plCtr = widget.plCtr;
-    final heroTag = _findHeroTag();
     widget.ctrl.hide();
-    final bvid = plCtr.bvid;
-    final cid = plCtr.cid;
-    if (bvid.isNotEmpty && cid != null && heroTag != null) {
-      Get.toNamed(
-        '/videoV',
-        arguments: {
-          'bvid': bvid,
-          'cid': cid,
-          'heroTag': heroTag,
-          'videoType': VideoType.ugc,
-        },
-      );
-    } else {
-      Get.toNamed('/videoV');
-    }
-  }
-
-  String? _findHeroTag() {
-    try {
-      final args = Get.arguments;
-      if (args is Map && args['heroTag'] != null) {
-        return args['heroTag'] as String;
-      }
-    } catch (_) {}
-    return 'mini_player_${DateTime.now().millisecondsSinceEpoch}';
+    // Pop back to the video page that's already in the navigation stack.
+    // We never create a new route — the video page was pushed before
+    // we navigated away, so it's still in the stack underneath.
+    Get.key.currentState?.popUntil((route) => route.settings.name == '/videoV');
   }
 
   @override
@@ -157,21 +131,25 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               else
                 Container(color: Colors.black),
 
-              // Drag + tap handler — uses raw pointer events, no gesture arena conflict
+              // Tap-to-expand (GestureDetector catches taps on video area)
+              // Must be BELOW controls in Stack order so buttons work
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: _onTap,
+                  behavior: HitTestBehavior.translucent,
+                ),
+              ),
+
+              // Drag listener — raw pointer events, no gesture arena conflict
               Positioned.fill(
                 child: Listener(
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (event) {
-                    if (_dragPointer == null) {
-                      _dragPointer = event.pointer;
-                      _dragStartPos = widget.ctrl.position.value;
-                      _dragPointerStart = event.position;
-                    }
+                    _dragStartPos = widget.ctrl.position.value;
+                    _dragPointerStart = event.position;
                   },
                   onPointerMove: (event) {
-                    if (event.pointer == _dragPointer &&
-                        _dragStartPos != null &&
-                        _dragPointerStart != null) {
+                    if (_dragStartPos != null && _dragPointerStart != null) {
                       final ctrl = widget.ctrl;
                       final delta = event.position - _dragPointerStart!;
                       final newPos = ctrl.clampPosition(
@@ -186,28 +164,17 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     }
                   },
                   onPointerUp: (event) {
-                    if (event.pointer == _dragPointer) {
-                      // Detect tap: if moved less than 5px, treat as tap
-                      if (_dragPointerStart != null &&
-                          (event.position - _dragPointerStart!).distance < 5) {
-                        _onTap();
-                      }
-                      _dragPointer = null;
-                      _dragStartPos = null;
-                      _dragPointerStart = null;
-                    }
+                    _dragStartPos = null;
+                    _dragPointerStart = null;
                   },
                   onPointerCancel: (event) {
-                    if (event.pointer == _dragPointer) {
-                      _dragPointer = null;
-                      _dragStartPos = null;
-                      _dragPointerStart = null;
-                    }
+                    _dragStartPos = null;
+                    _dragPointerStart = null;
                   },
                 ),
               ),
 
-              // Bottom control bar
+              // Bottom control bar (stacked LAST so it's on TOP)
               Positioned(
                 left: 0,
                 right: 0,
@@ -271,45 +238,53 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 ),
               ),
 
-              // Resize handle at bottom-right — GestureDetector blocks drag below it
+              // Resize handle — positioned ABOVE the control bar
+              // Uses Listener (raw pointer events) instead of GestureDetector
+              // to avoid gesture arena conflict with SimpleVideo.
               Positioned(
                 right: 0,
                 bottom: 0,
-                child: GestureDetector(
-                  onPanStart: (details) {
-                    _resizeStartPos = details.localPosition;
-                    _resizeStartSize = widget.ctrl.size.value;
-                  },
-                  onPanUpdate: (details) {
-                    if (_resizeStartPos != null && _resizeStartSize != null) {
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 2, bottom: 42),
+                  child: Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: (event) {
+                      _resizePointerStart = event.position;
+                      _resizeStartSize = widget.ctrl.size.value;
+                    },
+                    onPointerMove: (event) {
+                      if (_resizePointerStart == null || _resizeStartSize == null) return;
                       final ctrl = widget.ctrl;
-                      final delta = details.delta;
-                      final newWidth =
-                          (_resizeStartSize!.width + delta.dx).clamp(120.0, widget.screenSize.width * 0.85);
+                      final delta = event.position - _resizePointerStart!;
+                      final newWidth = (_resizeStartSize!.width + delta.dx)
+                          .clamp(120.0, widget.screenSize.width * 0.85);
                       final aspect = _resizeStartSize!.width / _resizeStartSize!.height;
                       ctrl.updateSize(Size(newWidth, newWidth / aspect));
-                      _resizeStartSize = ctrl.size.value;
-                    }
-                  },
-                  onPanEnd: (details) {
-                    _resizeStartPos = null;
-                    _resizeStartSize = null;
-                  },
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        bottomRight: Radius.circular(12),
+                    },
+                    onPointerUp: (_) {
+                      _resizePointerStart = null;
+                      _resizeStartSize = null;
+                    },
+                    onPointerCancel: (_) {
+                      _resizePointerStart = null;
+                      _resizeStartSize = null;
+                    },
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(8),
+                          bottomRight: Radius.circular(12),
+                        ),
                       ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      Icons.fit_screen_rounded,
-                      size: 16,
-                      color: Colors.white.withValues(alpha: 0.9),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.fit_screen_rounded,
+                        size: 18,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
                     ),
                   ),
                 ),
