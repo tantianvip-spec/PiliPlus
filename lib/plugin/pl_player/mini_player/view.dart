@@ -8,9 +8,6 @@ import 'package:get/get.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 /// Floating mini-player overlay widget.
-///
-/// Renders a draggable, resizable video player with basic controls
-/// that floats over other pages within the app.
 class MiniPlayerWidget extends StatelessWidget {
   const MiniPlayerWidget({super.key});
 
@@ -25,7 +22,6 @@ class MiniPlayerWidget extends StatelessWidget {
       final plCtr = PlPlayerController.instance;
       if (plCtr == null) return const SizedBox.shrink();
 
-      // Initialize size on first show
       ctrl.initSize(screenSize);
 
       final offset = ctrl.position.value;
@@ -69,23 +65,23 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   late final Animation<Offset> _slideAnimation;
   late final Animation<double> _fadeAnimation;
 
-  // Track drag position
-  Offset? _dragStartPosition;
-  Offset? _dragStartFocalPoint;
+  // Drag tracking via raw pointer events
+  int? _dragPointer;
+  Offset? _dragStartPos;
+  Offset? _dragPointerStart;
 
-  // Track pinch
-  Size? _pinchStartSize;
-  double? _pinchStartScale;
+  // Resize tracking
+  int? _resizePointer;
+  Offset? _resizeStartPos;
+  Size? _resizeStartSize;
 
   @override
   void initState() {
     super.initState();
-
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
@@ -93,12 +89,10 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
       parent: _animController,
       curve: Curves.easeOutCubic,
     ));
-
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
       parent: _animController,
       curve: Curves.easeOut,
     ));
-
     _animController.forward();
   }
 
@@ -107,55 +101,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     _animController.dispose();
     super.dispose();
   }
-
-  // ---- Drag (pan) handling on the gesture overlay ----
-
-  void _onPanStart(DragStartDetails details) {
-    _dragStartPosition = widget.ctrl.position.value;
-    _dragStartFocalPoint = details.localPosition;
-  }
-
-  void _onPanUpdate(DragUpdateDetails details) {
-    final ctrl = widget.ctrl;
-    final start = _dragStartPosition ?? ctrl.position.value;
-    final playerSize = ctrl.size.value;
-    ctrl.updatePosition(ctrl.clampPosition(
-      Offset(
-        start.dx - details.delta.dx,
-        start.dy - details.delta.dy,
-      ),
-      playerSize,
-      widget.screenSize,
-    ));
-  }
-
-  void _onPanEnd(DragEndDetails details) {
-    _dragStartPosition = null;
-    _dragStartFocalPoint = null;
-  }
-
-  // ---- Resize via dedicated bottom-right handle ----
-
-  void _onResizeStart(DragStartDetails details) {
-    _pinchStartSize = widget.ctrl.size.value;
-  }
-
-  void _onResizeUpdate(DragUpdateDetails details) {
-    final ctrl = widget.ctrl;
-    final currentSize = _pinchStartSize ?? ctrl.size.value;
-    // Drag down-right = grow; delta.dx is positive to the right
-    final double newWidth = (currentSize.width + details.delta.dx)
-        .clamp(120.0, widget.screenSize.width * 0.85);
-    final double aspect = currentSize.width / currentSize.height;
-    ctrl.updateSize(Size(newWidth, newWidth / aspect));
-    _pinchStartSize = ctrl.size.value; // update for next frame
-  }
-
-  void _onResizeEnd(DragEndDetails details) {
-    _pinchStartSize = null;
-  }
-
-  // ---- Tap to expand ----
 
   void _onTap() {
     final plCtr = widget.plCtr;
@@ -201,7 +146,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Layer 1: Video content
+              // Video content
               if (plCtr.videoController != null)
                 SimpleVideo(
                   controller: plCtr.videoController!,
@@ -210,18 +155,59 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               else
                 Container(color: Colors.black),
 
-              // Layer 2: Gesture overlay for drag + tap
-              // Sits above video but BELOW controls in stacking order
+              // Tap-to-expand overlay (catches taps only)
               Positioned.fill(
                 child: GestureDetector(
                   onTap: _onTap,
-                  onPanStart: _onPanStart,
-                  onPanUpdate: _onPanUpdate,
-                  onPanEnd: _onPanEnd,
+                  behavior: HitTestBehavior.translucent,
                 ),
               ),
 
-              // Layer 3: Bottom control bar (on top, catches its own events)
+              // Drag listener — uses raw pointer events, doesn't compete with gestures
+              Positioned.fill(
+                child: Listener(
+                  onPointerDown: (event) {
+                    if (_dragPointer == null) {
+                      _dragPointer = event.pointer;
+                      _dragStartPos = widget.ctrl.position.value;
+                      _dragPointerStart = event.position;
+                    }
+                  },
+                  onPointerMove: (event) {
+                    if (event.pointer == _dragPointer &&
+                        _dragStartPos != null &&
+                        _dragPointerStart != null) {
+                      final ctrl = widget.ctrl;
+                      final delta = event.position - _dragPointerStart!;
+                      final newPos = ctrl.clampPosition(
+                        Offset(
+                          _dragStartPos!.dx - delta.dx,
+                          _dragStartPos!.dy - delta.dy,
+                        ),
+                        ctrl.size.value,
+                        widget.screenSize,
+                      );
+                      ctrl.updatePosition(newPos);
+                    }
+                  },
+                  onPointerUp: (event) {
+                    if (event.pointer == _dragPointer) {
+                      _dragPointer = null;
+                      _dragStartPos = null;
+                      _dragPointerStart = null;
+                    }
+                  },
+                  onPointerCancel: (event) {
+                    if (event.pointer == _dragPointer) {
+                      _dragPointer = null;
+                      _dragStartPos = null;
+                      _dragPointerStart = null;
+                    }
+                  },
+                ),
+              ),
+
+              // Bottom control bar
               Positioned(
                 left: 0,
                 right: 0,
@@ -240,14 +226,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                   ),
                   child: Row(
                     children: [
-                      // Play/Pause
                       _ControlButton(
                         icon: Obx(() {
                           final isPlaying = plCtr.playerStatus.isPlaying;
                           return Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
+                            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                             size: 20,
                             color: Colors.white,
                           );
@@ -260,8 +243,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                           }
                         },
                       ),
-
-                      // Progress
                       Expanded(
                         child: Obx(() {
                           final position = plCtr.positionSeconds.value;
@@ -281,14 +262,8 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                           );
                         }),
                       ),
-
-                      // Close
                       _ControlButton(
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          size: 20,
-                          color: Colors.white,
-                        ),
+                        icon: const Icon(Icons.close_rounded, size: 20, color: Colors.white),
                         onTap: widget.ctrl.close,
                       ),
                     ],
@@ -296,14 +271,42 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 ),
               ),
 
-              // Layer 4: Resize handle at bottom-right corner
+              // Resize handle at bottom-right
               Positioned(
                 right: 0,
                 bottom: 0,
-                child: GestureDetector(
-                  onPanStart: _onResizeStart,
-                  onPanUpdate: _onResizeUpdate,
-                  onPanEnd: _onResizeEnd,
+                child: Listener(
+                  onPointerDown: (event) {
+                    _resizePointer = event.pointer;
+                    _resizeStartPos = event.position;
+                    _resizeStartSize = widget.ctrl.size.value;
+                  },
+                  onPointerMove: (event) {
+                    if (event.pointer == _resizePointer &&
+                        _resizeStartPos != null &&
+                        _resizeStartSize != null) {
+                      final ctrl = widget.ctrl;
+                      final delta = event.position - _resizeStartPos!;
+                      final newWidth =
+                          (_resizeStartSize!.width + delta.dx).clamp(120.0, widget.screenSize.width * 0.85);
+                      final aspect = _resizeStartSize!.width / _resizeStartSize!.height;
+                      ctrl.updateSize(Size(newWidth, newWidth / aspect));
+                    }
+                  },
+                  onPointerUp: (event) {
+                    if (event.pointer == _resizePointer) {
+                      _resizePointer = null;
+                      _resizeStartPos = null;
+                      _resizeStartSize = null;
+                    }
+                  },
+                  onPointerCancel: (event) {
+                    if (event.pointer == _resizePointer) {
+                      _resizePointer = null;
+                      _resizeStartPos = null;
+                      _resizeStartSize = null;
+                    }
+                  },
                   child: Container(
                     width: 28,
                     height: 28,
