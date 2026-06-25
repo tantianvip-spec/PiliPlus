@@ -194,6 +194,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
             onScaleStart: _onScaleStart,
             onScaleUpdate: _onScaleUpdate,
             onScaleEnd: _onScaleEnd,
+            onTap: _onTap,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -205,14 +206,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                   )
                 else
                   Container(color: Colors.black),
-
-                // Tap to expand overlay (opaque: don't steal taps from controls above)
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: _onTap,
-                    behavior: HitTestBehavior.opaque,
-                  ),
-                ),
 
                 // Bottom control bar
                 Positioned(

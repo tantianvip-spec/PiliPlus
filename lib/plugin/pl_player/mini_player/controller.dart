@@ -83,7 +83,7 @@ class MiniPlayerController extends GetxController {
   /// Clamp size within min/max bounds.
   Size clampSize(Size newSize, Size screenSize) {
     const double minW = 120.0;
-    final double maxW = screenSize.width * 0.5;
+    final double maxW = screenSize.width * 0.85;
     const double minH = minW * 9 / 16;
     final double maxH = maxW * 9 / 16;
     final double w = newSize.width.clamp(minW, maxW);
