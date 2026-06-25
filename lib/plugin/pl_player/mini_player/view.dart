@@ -274,6 +274,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 right: 0,
                 bottom: 0,
                 child: Listener(
+                  behavior: HitTestBehavior.translucent,
                   onPointerDown: (event) {
                     _resizePointer = event.pointer;
                     _resizeStartPos = event.position;
