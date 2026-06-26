@@ -1,9 +1,7 @@
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
-import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -113,10 +111,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     debugPrint('[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid');
     // Notify the video page that it is being restored from the mini-player,
     // so didPopNext() skips playerInit() and just re-enables the video surface.
-    ctrl.markReturningFromMiniPlayer();
     // Hide mini-player — this removes its SimpleVideo from the widget tree at
     // the end of the current frame.
-    ctrl.hide();
+    ctrl
+      ..markReturningFromMiniPlayer()
+      ..hide();
     // Wait 1 frame (plus a small safety margin) for the mini-player's
     // SimpleVideo to be fully released, then either pop back to the existing
     // video page or open a fresh one if the video page is no longer in stack.
@@ -334,7 +333,9 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     },
                     onPointerMove: (event) {
                       if (_resizePointerStart == null ||
-                          _resizeStartSize == null) return;
+                          _resizeStartSize == null) {
+                        return;
+                      }
                       final ctrl = widget.ctrl;
                       final delta = event.position - _resizePointerStart!;
                       final newWidth = (_resizeStartSize!.width + delta.dx)
