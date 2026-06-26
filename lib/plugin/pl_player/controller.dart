@@ -1611,6 +1611,7 @@ class PlPlayerController with BlockConfigMixin {
   }
 
   void dispose() {
+    debugPrint('[PlPlayer] dispose() called, _playerCount=$_playerCount, _isCloseAll=$_isCloseAll');
     // 每次减1，最后销毁
     resetScreenRotation();
     cancelLongPressTimer();
@@ -1622,6 +1623,7 @@ class PlPlayerController with BlockConfigMixin {
     }
 
     _playerCount = 0;
+    debugPrint('[PlPlayer] dispose: doing full cleanup');
     if (removeSafeArea) {
       showSystemBar();
     }
@@ -1664,10 +1666,12 @@ class PlPlayerController with BlockConfigMixin {
     if (kDebugMode) {
       debugPrint('dispose player');
     }
+    debugPrint('[PlPlayer] dispose: disposing _videoPlayerController');
     _videoPlayerController?.dispose();
     _videoPlayerController = null;
     _videoController = null;
     _instance = null;
+    debugPrint('[PlPlayer] dispose: _instance set to null');
     videoPlayerServiceHandler?.clear();
   }
 

@@ -3,6 +3,7 @@ import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
 import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -103,25 +104,41 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   void _onTap() {
     final ctrl = widget.ctrl;
     final plCtr = widget.plCtr;
+    debugPrint('[MiniPlayer] _onTap start, bvid=${plCtr.bvid}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
     // Read bvid/cid BEFORE dispose clears them.
     final bvid = plCtr.bvid;
     final cid = plCtr.cid;
+    debugPrint('[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid');
     ctrl.markTapToExpand();
     ctrl.hide();
+    debugPrint('[MiniPlayer] _onTap after hide');
     // Wait for SimpleVideo to fully unmount from the widget tree,
     // then dispose the player and navigate to a fresh video page.
     // This avoids dual-SimpleVideo crashes entirely.
     Future.delayed(const Duration(milliseconds: 100), () {
-      plCtr.dispose();
-      Get.offNamed(
-        '/videoV',
-        arguments: {
-          'bvid': bvid,
-          'cid': cid,
-          'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
-          'videoType': VideoType.ugc,
-        },
-      );
+      debugPrint('[MiniPlayer] _onTap delayed callback firing');
+      try {
+        debugPrint('[MiniPlayer] calling plCtr.dispose()');
+        plCtr.dispose();
+        debugPrint('[MiniPlayer] plCtr.dispose() returned');
+      } catch (e, s) {
+        debugPrint('[MiniPlayer] ERROR in plCtr.dispose(): $e\n$s');
+      }
+      try {
+        debugPrint('[MiniPlayer] calling Get.offNamed to /videoV');
+        Get.offNamed(
+          '/videoV',
+          arguments: {
+            'bvid': bvid,
+            'cid': cid,
+            'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
+            'videoType': VideoType.ugc,
+          },
+        );
+        debugPrint('[MiniPlayer] Get.offNamed returned');
+      } catch (e, s) {
+        debugPrint('[MiniPlayer] ERROR in Get.offNamed: $e\n$s');
+      }
     });
   }
 

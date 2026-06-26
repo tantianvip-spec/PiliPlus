@@ -64,7 +64,7 @@ import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:PiliPlus/utils/theme_utils.dart';
 import 'package:extended_nested_scroll_view/extended_nested_scroll_view.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -349,9 +349,14 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       videoPlayerServiceHandler?.onVideoDetailDispose(heroTag);
       if (plPlayerController != null) {
         videoDetailController.makeHeartBeat();
+        final miniVisible = MiniPlayerController.instance.isVisible.value;
+        debugPrint('[VideoPage] dispose: miniPlayerVisible=$miniVisible');
         // Don't dispose if mini-player is showing — it needs the player
-        if (!MiniPlayerController.instance.isVisible.value) {
+        if (!miniVisible) {
+          debugPrint('[VideoPage] dispose: calling plPlayerController.dispose()');
           plPlayerController!.dispose();
+        } else {
+          debugPrint('[VideoPage] dispose: skipping dispose, mini-player is active');
         }
       } else {
         PlPlayerController.updatePlayCount();
@@ -366,6 +371,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   // 离开当前页面时
   void didPushNext() {
     super.didPushNext();
+    debugPrint('[VideoPage] didPushNext');
     isShowing = false;
 
     removeObserverMobile(this);
@@ -386,10 +392,14 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       plPlayerController!
         ..removeStatusLister(playerListener)
         ..removePositionListener(positionListener);
-      if (plPlayerController!.playerStatus.isPlaying) {
+      final isPlaying = plPlayerController!.playerStatus.isPlaying;
+      debugPrint('[VideoPage] didPushNext: isPlaying=$isPlaying');
+      if (isPlaying) {
         // Navigated away while playing → show mini-player
+        debugPrint('[VideoPage] didPushNext: showing mini-player');
         MiniPlayerController.instance.show();
       } else {
+        debugPrint('[VideoPage] didPushNext: pausing player');
         plPlayerController!.pause();
       }
     }
@@ -399,6 +409,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   // 返回当前页面时
   void didPopNext() {
     super.didPopNext();
+    debugPrint('[VideoPage] didPopNext');
 
     if (videoDetailController.plPlayerController.isCloseAll) {
       return;
@@ -409,6 +420,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     // so we can detect mini-player return even after hide() already ran.
     final miniPlayerCtrl = MiniPlayerController.instance;
     final returnedFromMiniPlayer = miniPlayerCtrl.tapToExpandTriggered;
+    debugPrint('[VideoPage] didPopNext: tapToExpandTriggered=$returnedFromMiniPlayer, isVisible=${miniPlayerCtrl.isVisible.value}');
     if (returnedFromMiniPlayer) {
       miniPlayerCtrl.clearTapToExpand();
       if (miniPlayerCtrl.isVisible.value) {
