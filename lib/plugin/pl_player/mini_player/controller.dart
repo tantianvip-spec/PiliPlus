@@ -73,20 +73,23 @@ class MiniPlayerController extends GetxController {
     size.value = newSize;
   }
 
+  /// Compute the default mini-player size for [screenSize] without mutating state.
+  Size defaultSizeFor(Size screenSize) {
+    final double w =
+        (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
+    return Size(w, w * 9 / 16);
+  }
+
   /// Initialize size based on screen width on first show.
   void initSize(Size screenSize) {
     if (size.value == Size.zero) {
-      final double w =
-          (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
-      size.value = Size(w, w * 9 / 16);
+      size.value = defaultSizeFor(screenSize);
     }
   }
 
   /// Reset size to default.
   void resetSize(Size screenSize) {
-    final double w =
-        (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
-    size.value = Size(w, w * 9 / 16);
+    size.value = defaultSizeFor(screenSize);
   }
 
   /// Clamp position so the mini-player stays within screen bounds.

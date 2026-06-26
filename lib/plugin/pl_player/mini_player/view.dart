@@ -17,6 +17,15 @@ class MiniPlayerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = MiniPlayerController.instance;
     final screenSize = MediaQuery.sizeOf(context);
+    final fallbackSize = ctrl.defaultSizeFor(screenSize);
+
+    // Defer the controller-side size mutation to avoid calling setState
+    // during the initial build of the Obx/Positioned widget.
+    if (ctrl.size.value == Size.zero) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ctrl.initSize(screenSize);
+      });
+    }
 
     return Obx(() {
       if (!ctrl.isVisible.value) return const SizedBox.shrink();
@@ -27,7 +36,8 @@ class MiniPlayerWidget extends StatelessWidget {
       final offset = ctrl.position.value;
       final right = offset.dx;
       final bottom = offset.dy;
-      final playerSize = ctrl.size.value;
+      final playerSize =
+          ctrl.size.value == Size.zero ? fallbackSize : ctrl.size.value;
 
       return Positioned(
         right: right,
@@ -80,7 +90,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   @override
   void initState() {
     super.initState();
-    widget.ctrl.initSize(widget.screenSize);
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
