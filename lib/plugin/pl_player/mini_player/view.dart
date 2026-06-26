@@ -107,38 +107,43 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     debugPrint('[MiniPlayer] _onTap start, bvid=${plCtr.bvid}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
     // Read bvid/cid BEFORE dispose clears them.
     final bvid = plCtr.bvid;
-    final cid = plCtr.cid;
+    // cid is int? — provide a fallback so RxInt(args['cid']) doesn't crash
+    final cid = plCtr.cid ?? 0;
     debugPrint('[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid');
     ctrl.markTapToExpand();
+    // Step 1: hide mini-player — this removes its SimpleVideo from the
+    // widget tree at the end of the current frame.
     ctrl.hide();
-    debugPrint('[MiniPlayer] _onTap after hide');
-    // Wait for SimpleVideo to fully unmount from the widget tree,
-    // then dispose the player and navigate to a fresh video page.
-    // This avoids dual-SimpleVideo crashes entirely.
-    Future.delayed(const Duration(milliseconds: 100), () {
-      debugPrint('[MiniPlayer] _onTap delayed callback firing');
-      try {
-        debugPrint('[MiniPlayer] calling plCtr.dispose()');
-        plCtr.dispose();
-        debugPrint('[MiniPlayer] plCtr.dispose() returned');
-      } catch (e, s) {
-        debugPrint('[MiniPlayer] ERROR in plCtr.dispose(): $e\n$s');
-      }
-      try {
-        debugPrint('[MiniPlayer] calling Get.offNamed to /videoV');
-        Get.offNamed(
-          '/videoV',
-          arguments: {
-            'bvid': bvid,
-            'cid': cid,
-            'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
-            'videoType': VideoType.ugc,
-          },
-        );
-        debugPrint('[MiniPlayer] Get.offNamed returned');
-      } catch (e, s) {
-        debugPrint('[MiniPlayer] ERROR in Get.offNamed: $e\n$s');
-      }
+    // Step 2: wait 1 frame for the mini-player to fully unmount, THEN
+    // dispose the player and navigate to a fresh video page.
+    // This avoids two SimpleVideo widgets bound to the same VideoController
+    // coexisting, which causes a media-kit crash.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        debugPrint('[MiniPlayer] delayed callback firing');
+        try {
+          debugPrint('[MiniPlayer] calling plCtr.dispose()');
+          plCtr.dispose();
+          debugPrint('[MiniPlayer] plCtr.dispose() returned');
+        } catch (e, s) {
+          debugPrint('[MiniPlayer] ERROR in plCtr.dispose(): $e\n$s');
+        }
+        try {
+          debugPrint('[MiniPlayer] calling Get.offNamed to /videoV');
+          Get.offNamed(
+            '/videoV',
+            arguments: {
+              'bvid': bvid,
+              'cid': cid,
+              'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
+              'videoType': VideoType.ugc,
+            },
+          );
+          debugPrint('[MiniPlayer] Get.offNamed returned');
+        } catch (e, s) {
+          debugPrint('[MiniPlayer] ERROR in Get.offNamed: $e\n$s');
+        }
+      });
     });
   }
 

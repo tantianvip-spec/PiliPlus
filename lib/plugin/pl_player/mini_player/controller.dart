@@ -25,19 +25,6 @@ class MiniPlayerController extends GetxController {
   /// Current size of the mini-player. Initialized on first show.
   final Rx<Size> size = Size.zero.obs;
 
-  // ---- Tap-to-expand flag ----
-  //
-  // Decouples "did we come from mini-player?" detection from isVisible.
-  // _onTap in the mini-player view sets this to true BEFORE hide() and
-  // popUntil(). didPopNext on the video page reads this flag and clears
-  // it, which lets it correctly skip playerInit even if hide() already
-  // ran. Without this flag, the check depended on isVisible timing,
-  // which was unreliable when hide() ran before popUntil().
-  bool _tapToExpandTriggered = false;
-  bool get tapToExpandTriggered => _tapToExpandTriggered;
-  void markTapToExpand() => _tapToExpandTriggered = true;
-  void clearTapToExpand() => _tapToExpandTriggered = false;
-
   /// Show the mini-player overlay.
   void show() {
     final ctr = PlPlayerController.instance;
