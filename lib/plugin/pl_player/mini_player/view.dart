@@ -110,7 +110,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     // cid is int? — provide a fallback so RxInt(args['cid']) doesn't crash
     final cid = plCtr.cid ?? 0;
     debugPrint('[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid');
-    ctrl.markTapToExpand();
+    // ctrl.markTapToExpand();  // removed — no longer needed
     // Step 1: hide mini-player — this removes its SimpleVideo from the
     // widget tree at the end of the current frame.
     ctrl.hide();
