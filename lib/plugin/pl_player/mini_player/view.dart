@@ -217,11 +217,15 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
         // No existing video page in the stack (e.g. the user minimized the
         // player with the in-page minimize button). Dispose the player safely
-        // — no other SimpleVideo is bound to it — and open a fresh video page.
+        // — no other SimpleVideo is bound to it — and open a fresh video page,
+        // preserving the current play/pause state and playback position.
         ctrl.clearReturningFromMiniPlayer();
+        final wasPlaying = plCtr.playerStatus.isPlaying;
+        final seekTo = plCtr.position.inMilliseconds;
         if (kDebugMode) {
           debugPrint(
               '[MiniPlayer] no existing /videoV route; disposing player and opening fresh page');
+          debugPrint('[MiniPlayer] preserved state: playing=$wasPlaying, seekTo=$seekTo');
         }
         try {
           if (kDebugMode) {
@@ -251,6 +255,8 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               'epId': ?epid,
               'seasonId': ?seasonId,
               'pgcType': ?pgcType,
+              'seekTo': seekTo,
+              'autoPlay': wasPlaying,
             },
           );
           if (kDebugMode) {
@@ -488,9 +494,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                             widget.ctrl.applyPreset(widget.screenSize, factor);
                           },
                           itemBuilder: (context) => [
-                            const PopupMenuItem(
-                                value: 0.30,
-                                child: Text('小', style: TextStyle(color: Colors.white))),
                             const PopupMenuItem(
                                 value: 0.45,
                                 child: Text('中', style: TextStyle(color: Colors.white))),
