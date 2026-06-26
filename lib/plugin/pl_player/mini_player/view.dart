@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
+import 'package:PiliPlus/plugin/pl_player/mini_player/gesture_math.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -68,9 +69,10 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   Offset? _dragStartPos;
   Offset? _dragPointerStart;
 
-  // Resize tracking
-  Offset? _resizePointerStart;
-  Size? _resizeStartSize;
+  // Pinch tracking
+  final Map<int, Offset> _activePointers = {};
+  double? _pinchStartDistance;
+  Size? _pinchStartSize;
 
   @override
   void initState() {
@@ -97,6 +99,29 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   void dispose() {
     _animController.dispose();
     super.dispose();
+  }
+
+  /// Returns true if [globalPosition] is inside the bottom control bar.
+  bool _isInControlBar(Offset globalPosition) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return false;
+    final local = box.globalToLocal(globalPosition);
+    return local.dy > box.size.height - 40;
+  }
+
+  void _handlePointerLift() {
+    _pinchStartDistance = null;
+    _pinchStartSize = null;
+
+    if (_activePointers.length == 1) {
+      // Continue dragging with the remaining finger from its current position.
+      final remaining = _activePointers.entries.first;
+      _dragPointerStart = remaining.value;
+      _dragStartPos = widget.ctrl.position.value;
+    } else {
+      _dragPointerStart = null;
+      _dragStartPos = null;
+    }
   }
 
   void _onTap() {
@@ -216,17 +241,52 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 ),
               ),
 
-              // Drag listener — raw pointer events, no gesture arena conflict
+              // Drag + pinch listener — raw pointer events, no gesture arena conflict
               Positioned.fill(
                 child: Listener(
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (event) {
-                    _dragStartPos = widget.ctrl.position.value;
-                    _dragPointerStart = event.position;
+                    _activePointers[event.pointer] = event.position;
+                    final ctrl = widget.ctrl;
+
+                    if (_activePointers.length == 1) {
+                      _dragStartPos = ctrl.position.value;
+                      _dragPointerStart = event.position;
+                    } else if (_activePointers.length == 2) {
+                      // Second finger: switch from drag to pinch only if both
+                      // fingers are outside the bottom control bar.
+                      final positions = _activePointers.values.toList();
+                      if (_isInControlBar(positions[0]) ||
+                          _isInControlBar(positions[1])) {
+                        return;
+                      }
+                      _dragStartPos = null;
+                      _dragPointerStart = null;
+                      _pinchStartDistance =
+                          (positions[0] - positions[1]).distance;
+                      _pinchStartSize = ctrl.size.value;
+                    }
                   },
                   onPointerMove: (event) {
-                    if (_dragStartPos != null && _dragPointerStart != null) {
-                      final ctrl = widget.ctrl;
+                    if (!_activePointers.containsKey(event.pointer)) {
+                      return;
+                    }
+                    _activePointers[event.pointer] = event.position;
+                    final ctrl = widget.ctrl;
+
+                    if (_activePointers.length == 2 &&
+                        _pinchStartDistance != null &&
+                        _pinchStartSize != null) {
+                      final newSize = computePinchSize(
+                        pointers: _activePointers,
+                        startDistance: _pinchStartDistance!,
+                        startSize: _pinchStartSize!,
+                        screenSize: widget.screenSize,
+                      );
+                      ctrl.updateSize(newSize);
+                    } else if (_activePointers.length == 1 &&
+                        _dragStartPos != null &&
+                        _dragPointerStart != null) {
                       final delta = event.position - _dragPointerStart!;
                       final newPos = ctrl.clampPosition(
                         Offset(
@@ -240,12 +300,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     }
                   },
                   onPointerUp: (event) {
-                    _dragStartPos = null;
-                    _dragPointerStart = null;
+                    _activePointers.remove(event.pointer);
+                    _handlePointerLift();
                   },
                   onPointerCancel: (event) {
-                    _dragStartPos = null;
-                    _dragPointerStart = null;
+                    _activePointers.remove(event.pointer);
+                    _handlePointerLift();
                   },
                 ),
               ),
@@ -317,61 +377,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 ),
               ),
 
-              // Resize handle — positioned ABOVE the control bar
-              // Uses Listener (raw pointer events) instead of GestureDetector
-              // to avoid gesture arena conflict with SimpleVideo.
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 2, bottom: 42),
-                  child: Listener(
-                    behavior: HitTestBehavior.translucent,
-                    onPointerDown: (event) {
-                      _resizePointerStart = event.position;
-                      _resizeStartSize = widget.ctrl.size.value;
-                    },
-                    onPointerMove: (event) {
-                      if (_resizePointerStart == null ||
-                          _resizeStartSize == null) {
-                        return;
-                      }
-                      final ctrl = widget.ctrl;
-                      final delta = event.position - _resizePointerStart!;
-                      final newWidth = (_resizeStartSize!.width + delta.dx)
-                          .clamp(120.0, widget.screenSize.width * 0.85);
-                      final aspect =
-                          _resizeStartSize!.width / _resizeStartSize!.height;
-                      ctrl.updateSize(Size(newWidth, newWidth / aspect));
-                    },
-                    onPointerUp: (_) {
-                      _resizePointerStart = null;
-                      _resizeStartSize = null;
-                    },
-                    onPointerCancel: (_) {
-                      _resizePointerStart = null;
-                      _resizeStartSize = null;
-                    },
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(8),
-                          bottomRight: Radius.circular(12),
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.fit_screen_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+
             ],
           ),
         ),
