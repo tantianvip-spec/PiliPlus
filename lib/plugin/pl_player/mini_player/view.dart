@@ -1,6 +1,7 @@
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
+import 'package:PiliPlus/models/common/video/video_type.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -101,15 +102,26 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
   void _onTap() {
     final ctrl = widget.ctrl;
+    final plCtr = widget.plCtr;
+    // Read bvid/cid BEFORE dispose clears them.
+    final bvid = plCtr.bvid;
+    final cid = plCtr.cid;
     ctrl.markTapToExpand();
     ctrl.hide();
-    // Wait 2 frames (via Future.delayed) for the mini-player's SimpleVideo
-    // to be fully removed from the widget tree before navigating back.
-    // addPostFrameCallback is NOT enough: both hide() and didPopNext's
-    // videoState=true would be processed in the SAME frame's build phase,
-    // causing two SimpleVideo widgets to coexist briefly and crash.
-    Future.delayed(const Duration(milliseconds: 50), () {
-      Get.key.currentState?.popUntil((route) => route.settings.name == '/videoV');
+    // Wait for SimpleVideo to fully unmount from the widget tree,
+    // then dispose the player and navigate to a fresh video page.
+    // This avoids dual-SimpleVideo crashes entirely.
+    Future.delayed(const Duration(milliseconds: 100), () {
+      plCtr.dispose();
+      Get.offNamed(
+        '/videoV',
+        arguments: {
+          'bvid': bvid,
+          'cid': cid,
+          'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
+          'videoType': VideoType.ugc,
+        },
+      );
     });
   }
 
