@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
@@ -78,8 +76,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   double? _pinchStartDistance;
   Size? _pinchStartSize;
 
-  // Dispose-safe tap action timer.
-  Timer? _tapActionTimer;
 
   @override
   void initState() {
@@ -105,9 +101,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
   @override
   void dispose() {
-    _tapActionTimer?.cancel();
-    _tapActionTimer = null;
-    widget.ctrl.clearReturningFromMiniPlayer();
     _animController.dispose();
     super.dispose();
   }
@@ -180,11 +173,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     // SimpleVideo to be fully released, then either pop back to the existing
     // video page or open a fresh one if the video page is no longer in stack.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _tapActionTimer = Timer(const Duration(milliseconds: 50), () {
-        if (!mounted) {
-          return;
-        }
+      Future.delayed(const Duration(milliseconds: 50), () {
         if (kDebugMode) {
           debugPrint('[MiniPlayer] delayed callback firing');
         }
@@ -282,14 +271,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Block pointer events from reaching the page behind the mini-player.
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  child: SizedBox.expand(),
-                ),
-              ),
-
               // Video content
               if (plCtr.videoController != null)
                 SimpleVideo(
@@ -413,9 +394,8 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () {},
+                child: Container(
+                  color: Colors.transparent,
                   child: Container(
                     height: _controlBarHeight,
                     decoration: BoxDecoration(
