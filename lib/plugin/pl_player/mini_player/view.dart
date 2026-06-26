@@ -22,8 +22,6 @@ class MiniPlayerWidget extends StatelessWidget {
       final plCtr = PlPlayerController.instance;
       if (plCtr == null) return const SizedBox.shrink();
 
-      ctrl.initSize(screenSize);
-
       final offset = ctrl.position.value;
       final right = offset.dx;
       final bottom = offset.dy;
@@ -80,6 +78,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   @override
   void initState() {
     super.initState();
+    widget.ctrl.initSize(widget.screenSize);
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
