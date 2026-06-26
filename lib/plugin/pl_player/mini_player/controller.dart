@@ -75,8 +75,11 @@ class MiniPlayerController extends GetxController {
 
   /// Compute the default mini-player size for [screenSize] without mutating state.
   Size defaultSizeFor(Size screenSize) {
-    final double w =
-        (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
+    const double minWidth = 160.0;
+    const double widthFactor = 0.45;
+    const double maxFactor = 0.65;
+    final double w = (screenSize.width * widthFactor)
+        .clamp(minWidth, screenSize.width * maxFactor);
     return Size(w, w * 9 / 16);
   }
 

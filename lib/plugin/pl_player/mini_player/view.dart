@@ -343,6 +343,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                       _pinchStartDistance =
                           (positions[0] - positions[1]).distance;
                       _pinchStartSize = ctrl.size.value;
+                      if (kDebugMode) {
+                        debugPrint(
+                          '[MiniPlayer] pinch start: distance=$_pinchStartDistance, startSize=$_pinchStartSize',
+                        );
+                      }
                     }
                   },
                   onPointerMove: (event) {
@@ -361,6 +366,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                         startSize: _pinchStartSize!,
                         screenSize: widget.screenSize,
                       );
+                      if (kDebugMode && newSize != ctrl.size.value) {
+                        debugPrint(
+                          '[MiniPlayer] pinch update: newSize=$newSize',
+                        );
+                      }
                       ctrl
                         ..updateSize(newSize)
                         ..updatePosition(
