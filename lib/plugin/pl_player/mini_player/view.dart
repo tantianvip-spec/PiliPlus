@@ -3,6 +3,7 @@ import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/gesture_math.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -117,10 +118,16 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     _dragCommitted = false;
 
     if (_activePointers.length == 1) {
-      // Continue dragging with the remaining finger from its current position.
+      // Continue dragging with the remaining finger from its current position,
+      // unless that finger is inside the control bar.
       final remaining = _activePointers.entries.first;
-      _dragPointerStart = remaining.value;
-      _dragStartPos = widget.ctrl.position.value;
+      if (_isInControlBar(remaining.value)) {
+        _dragPointerStart = null;
+        _dragStartPos = null;
+      } else {
+        _dragPointerStart = remaining.value;
+        _dragStartPos = widget.ctrl.position.value;
+      }
     } else {
       _dragPointerStart = null;
       _dragStartPos = null;
@@ -130,14 +137,18 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   void _onTap() {
     final ctrl = widget.ctrl;
     final plCtr = widget.plCtr;
-    debugPrint(
-        '[MiniPlayer] _onTap start, bvid=${plCtr.bvid}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
+    if (kDebugMode) {
+      debugPrint(
+          '[MiniPlayer] _onTap start, bvid=${plCtr.bvidOrNull}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
+    }
     // Read bvid/cid BEFORE any dispose clears them.
     final bvid = plCtr.bvidOrNull;
     // cid is int? — provide a fallback so RxInt(args['cid']) doesn't crash
     final cid = plCtr.cid ?? 0;
     if (bvid == null || bvid.isEmpty || cid == 0) {
-      debugPrint('[MiniPlayer] _onTap: invalid bvid/cid, hiding instead');
+      if (kDebugMode) {
+        debugPrint('[MiniPlayer] _onTap: invalid bvid/cid, hiding instead');
+      }
       ctrl.hide();
       return;
     }
@@ -146,8 +157,10 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     final epid = plCtr.epid;
     final seasonId = plCtr.seasonId;
     final pgcType = plCtr.pgcType;
-    debugPrint(
-        '[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid, aid=$aid, videoType=$videoType, epid=$epid, seasonId=$seasonId, pgcType=$pgcType');
+    if (kDebugMode) {
+      debugPrint(
+          '[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid, aid=$aid, videoType=$videoType, epid=$epid, seasonId=$seasonId, pgcType=$pgcType');
+    }
     // Notify the video page that it is being restored from the mini-player,
     // so didPopNext() skips playerInit() and just re-enables the video surface.
     // Hide mini-player — this removes its SimpleVideo from the widget tree at
@@ -160,7 +173,9 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     // video page or open a fresh one if the video page is no longer in stack.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 50), () {
-        debugPrint('[MiniPlayer] delayed callback firing');
+        if (kDebugMode) {
+          debugPrint('[MiniPlayer] delayed callback firing');
+        }
         var foundVideoRoute = false;
         try {
           final nav = Get.key.currentState;
@@ -178,11 +193,15 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
             });
           }
         } catch (e, s) {
-          debugPrint('[MiniPlayer] ERROR in popUntil: $e\n$s');
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] ERROR in popUntil: $e\n$s');
+          }
         }
 
         if (foundVideoRoute) {
-          debugPrint('[MiniPlayer] popped back to existing /videoV route');
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] popped back to existing /videoV route');
+          }
           return;
         }
 
@@ -190,17 +209,27 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
         // player with the in-page minimize button). Dispose the player safely
         // — no other SimpleVideo is bound to it — and open a fresh video page.
         ctrl.clearReturningFromMiniPlayer();
-        debugPrint(
-            '[MiniPlayer] no existing /videoV route; disposing player and opening fresh page');
-        try {
-          debugPrint('[MiniPlayer] calling plCtr.dispose()');
-          plCtr.dispose();
-          debugPrint('[MiniPlayer] plCtr.dispose() returned');
-        } catch (e, s) {
-          debugPrint('[MiniPlayer] ERROR in plCtr.dispose(): $e\n$s');
+        if (kDebugMode) {
+          debugPrint(
+              '[MiniPlayer] no existing /videoV route; disposing player and opening fresh page');
         }
         try {
-          debugPrint('[MiniPlayer] calling Get.toNamed to /videoV');
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] calling plCtr.dispose()');
+          }
+          plCtr.dispose();
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] plCtr.dispose() returned');
+          }
+        } catch (e, s) {
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] ERROR in plCtr.dispose(): $e\n$s');
+          }
+        }
+        try {
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] calling Get.toNamed to /videoV');
+          }
           Get.toNamed(
             '/videoV',
             arguments: {
@@ -214,9 +243,13 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               if (pgcType != null) 'pgcType': pgcType,
             },
           );
-          debugPrint('[MiniPlayer] Get.toNamed returned');
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] Get.toNamed returned');
+          }
         } catch (e, s) {
-          debugPrint('[MiniPlayer] ERROR in Get.toNamed: $e\n$s');
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] ERROR in Get.toNamed: $e\n$s');
+          }
         }
       });
     });
