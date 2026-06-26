@@ -418,6 +418,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     // If the mini-player is still visible, hide it (handles edge cases
     // where the user returns via system back gesture instead of tapping).
     final miniPlayerCtrl = MiniPlayerController.instance;
+    final returnedFromMiniPlayer = miniPlayerCtrl.returningFromMiniPlayer;
+    if (returnedFromMiniPlayer) {
+      miniPlayerCtrl.clearReturningFromMiniPlayer();
+      debugPrint('[VideoPage] didPopNext: returning from mini-player tap');
+    }
     if (miniPlayerCtrl.isVisible.value) {
       debugPrint('[VideoPage] didPopNext: hiding mini-player');
       miniPlayerCtrl.hide();
@@ -458,15 +463,24 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     plPlayerController
       ?..addStatusLister(playerListener)
       ..addPositionListener(positionListener);
-    // Normal return path: initialize the player.
-    if (videoDetailController.autoPlay) {
-      videoDetailController.playerInit(
-        autoplay: videoDetailController.playerStatus?.isPlaying ?? false,
-      );
-    } else if (videoDetailController.plPlayerController.preInitPlayer &&
-        !videoDetailController.isQuerying &&
-        videoDetailController.videoUrl != null) {
-      videoDetailController.playerInit();
+    if (returnedFromMiniPlayer) {
+      // The player is still running; just re-enable the video surface.
+      if (videoDetailController.autoPlay) {
+        debugPrint('[VideoPage] didPopNext: restoring videoState from mini-player');
+        videoDetailController.videoState.value = true;
+        videoDetailController.refreshPage();
+      }
+    } else {
+      // Normal return path: initialize the player.
+      if (videoDetailController.autoPlay) {
+        videoDetailController.playerInit(
+          autoplay: videoDetailController.playerStatus?.isPlaying ?? false,
+        );
+      } else if (videoDetailController.plPlayerController.preInitPlayer &&
+          !videoDetailController.isQuerying &&
+          videoDetailController.videoUrl != null) {
+        videoDetailController.playerInit();
+      }
     }
   }
 

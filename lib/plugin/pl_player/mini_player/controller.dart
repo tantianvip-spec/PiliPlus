@@ -25,6 +25,13 @@ class MiniPlayerController extends GetxController {
   /// Current size of the mini-player. Initialized on first show.
   final Rx<Size> size = Size.zero.obs;
 
+  /// Set while the user is tapping the mini-player to expand it back to the
+  /// video page. [VideoDetailPageV.didPopNext] reads this to skip playerInit().
+  bool _returningFromMiniPlayer = false;
+  bool get returningFromMiniPlayer => _returningFromMiniPlayer;
+  void markReturningFromMiniPlayer() => _returningFromMiniPlayer = true;
+  void clearReturningFromMiniPlayer() => _returningFromMiniPlayer = false;
+
   /// Show the mini-player overlay.
   void show() {
     final ctr = PlPlayerController.instance;
@@ -61,14 +68,16 @@ class MiniPlayerController extends GetxController {
   /// Initialize size based on screen width on first show.
   void initSize(Size screenSize) {
     if (size.value == Size.zero) {
-      final double w = (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
+      final double w =
+          (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
       size.value = Size(w, w * 9 / 16);
     }
   }
 
   /// Reset size to default.
   void resetSize(Size screenSize) {
-    final double w = (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
+    final double w =
+        (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
     size.value = Size(w, w * 9 / 16);
   }
 

@@ -104,23 +104,56 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   void _onTap() {
     final ctrl = widget.ctrl;
     final plCtr = widget.plCtr;
-    debugPrint('[MiniPlayer] _onTap start, bvid=${plCtr.bvid}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
-    // Read bvid/cid BEFORE dispose clears them.
+    debugPrint(
+        '[MiniPlayer] _onTap start, bvid=${plCtr.bvid}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
+    // Read bvid/cid BEFORE any dispose clears them.
     final bvid = plCtr.bvid;
     // cid is int? — provide a fallback so RxInt(args['cid']) doesn't crash
     final cid = plCtr.cid ?? 0;
     debugPrint('[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid');
-    // ctrl.markTapToExpand();  // removed — no longer needed
-    // Step 1: hide mini-player — this removes its SimpleVideo from the
-    // widget tree at the end of the current frame.
+    // Notify the video page that it is being restored from the mini-player,
+    // so didPopNext() skips playerInit() and just re-enables the video surface.
+    ctrl.markReturningFromMiniPlayer();
+    // Hide mini-player — this removes its SimpleVideo from the widget tree at
+    // the end of the current frame.
     ctrl.hide();
-    // Step 2: wait 1 frame for the mini-player to fully unmount, THEN
-    // dispose the player and navigate to a fresh video page.
-    // This avoids two SimpleVideo widgets bound to the same VideoController
-    // coexisting, which causes a media-kit crash.
+    // Wait 1 frame (plus a small safety margin) for the mini-player's
+    // SimpleVideo to be fully released, then either pop back to the existing
+    // video page or open a fresh one if the video page is no longer in stack.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 50), () {
         debugPrint('[MiniPlayer] delayed callback firing');
+        var foundVideoRoute = false;
+        try {
+          final nav = Get.key.currentState;
+          if (nav != null) {
+            nav.popUntil((route) {
+              if (route.settings.name == '/videoV') {
+                foundVideoRoute = true;
+                return true;
+              }
+              // Stop at the root route so we never pop the whole stack away.
+              if (route.isFirst) {
+                return true;
+              }
+              return false;
+            });
+          }
+        } catch (e, s) {
+          debugPrint('[MiniPlayer] ERROR in popUntil: $e\n$s');
+        }
+
+        if (foundVideoRoute) {
+          debugPrint('[MiniPlayer] popped back to existing /videoV route');
+          return;
+        }
+
+        // No existing video page in the stack (e.g. the user minimized the
+        // player with the in-page minimize button). Dispose the player safely
+        // — no other SimpleVideo is bound to it — and open a fresh video page.
+        ctrl.clearReturningFromMiniPlayer();
+        debugPrint(
+            '[MiniPlayer] no existing /videoV route; disposing player and opening fresh page');
         try {
           debugPrint('[MiniPlayer] calling plCtr.dispose()');
           plCtr.dispose();
@@ -129,19 +162,23 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
           debugPrint('[MiniPlayer] ERROR in plCtr.dispose(): $e\n$s');
         }
         try {
-          debugPrint('[MiniPlayer] calling Get.offNamed to /videoV');
-          Get.offNamed(
+          debugPrint('[MiniPlayer] calling Get.toNamed to /videoV');
+          Get.toNamed(
             '/videoV',
             arguments: {
               'bvid': bvid,
               'cid': cid,
+              if (plCtr.aid != null) 'aid': plCtr.aid,
               'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
-              'videoType': VideoType.ugc,
+              'videoType': plCtr.videoType,
+              if (plCtr.epid != null) 'epId': plCtr.epid,
+              if (plCtr.seasonId != null) 'seasonId': plCtr.seasonId,
+              if (plCtr.pgcType != null) 'pgcType': plCtr.pgcType,
             },
           );
-          debugPrint('[MiniPlayer] Get.offNamed returned');
+          debugPrint('[MiniPlayer] Get.toNamed returned');
         } catch (e, s) {
-          debugPrint('[MiniPlayer] ERROR in Get.offNamed: $e\n$s');
+          debugPrint('[MiniPlayer] ERROR in Get.toNamed: $e\n$s');
         }
       });
     });
@@ -237,7 +274,9 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                         icon: Obx(() {
                           final isPlaying = plCtr.playerStatus.isPlaying;
                           return Icon(
-                            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
                             size: 20,
                             color: Colors.white,
                           );
@@ -270,7 +309,8 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                         }),
                       ),
                       _ControlButton(
-                        icon: const Icon(Icons.close_rounded, size: 20, color: Colors.white),
+                        icon: const Icon(Icons.close_rounded,
+                            size: 20, color: Colors.white),
                         onTap: widget.ctrl.close,
                       ),
                     ],
@@ -293,12 +333,14 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                       _resizeStartSize = widget.ctrl.size.value;
                     },
                     onPointerMove: (event) {
-                      if (_resizePointerStart == null || _resizeStartSize == null) return;
+                      if (_resizePointerStart == null ||
+                          _resizeStartSize == null) return;
                       final ctrl = widget.ctrl;
                       final delta = event.position - _resizePointerStart!;
                       final newWidth = (_resizeStartSize!.width + delta.dx)
                           .clamp(120.0, widget.screenSize.width * 0.85);
-                      final aspect = _resizeStartSize!.width / _resizeStartSize!.height;
+                      final aspect =
+                          _resizeStartSize!.width / _resizeStartSize!.height;
                       ctrl.updateSize(Size(newWidth, newWidth / aspect));
                     },
                     onPointerUp: (_) {
