@@ -1,6 +1,13 @@
 name: Build Test APK
 
 on:
+    pull_request:
+        types:
+            - opened
+            - synchronize
+            - reopened
+        paths-ignore:
+            - "**.md"
     workflow_dispatch:
         inputs:
             build_type:
@@ -11,6 +18,9 @@ on:
                 options:
                     - debug
                     - release
+
+env:
+    BUILD_TYPE: ${{ github.event.inputs.build_type || 'debug' }}
 
 jobs:
     build_apk:
@@ -47,12 +57,12 @@ jobs:
               run: lib/scripts/patch.ps1 android
 
             - name: 构建 Debug APK
-              if: github.event.inputs.build_type == 'debug'
+              if: env.BUILD_TYPE == 'debug'
               run: |
                   flutter build apk --debug --split-per-abi --pub
 
             - name: 构建 Release APK（未签名）
-              if: github.event.inputs.build_type == 'release'
+              if: env.BUILD_TYPE == 'release'
               run: |
                   flutter build apk --release --split-per-abi --android-project-arg dev=1 --pub
 

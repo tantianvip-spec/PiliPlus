@@ -159,6 +159,19 @@ class PlPlayerController with BlockConfigMixin {
   int? _seasonId;
   int? _pgcType;
   VideoType _videoType = VideoType.ugc;
+
+  int? get aid => _aid;
+
+  String? get bvidOrNull => _bvid;
+
+  int? get epid => _epid;
+
+  int? get seasonId => _seasonId;
+
+  int? get pgcType => _pgcType;
+
+  VideoType get videoType => _videoType;
+
   int _heartDuration = 0;
   int? width;
   int? height;

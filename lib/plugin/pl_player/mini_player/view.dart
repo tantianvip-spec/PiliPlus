@@ -1,9 +1,10 @@
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
-import 'package:PiliPlus/models/common/video/video_type.dart';
+import 'package:PiliPlus/plugin/pl_player/mini_player/gesture_math.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -22,8 +23,6 @@ class MiniPlayerWidget extends StatelessWidget {
 
       final plCtr = PlPlayerController.instance;
       if (plCtr == null) return const SizedBox.shrink();
-
-      ctrl.initSize(screenSize);
 
       final offset = ctrl.position.value;
       final right = offset.dx;
@@ -62,6 +61,8 @@ class _MiniPlayerContent extends StatefulWidget {
 
 class _MiniPlayerContentState extends State<_MiniPlayerContent>
     with SingleTickerProviderStateMixin {
+  static const double _controlBarHeight = 40.0;
+
   late final AnimationController _animController;
   late final Animation<Offset> _slideAnimation;
   late final Animation<double> _fadeAnimation;
@@ -69,14 +70,17 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   // Drag tracking
   Offset? _dragStartPos;
   Offset? _dragPointerStart;
+  bool _dragCommitted = false;
 
-  // Resize tracking
-  Offset? _resizePointerStart;
-  Size? _resizeStartSize;
+  // Pinch tracking
+  final Map<int, Offset> _activePointers = {};
+  double? _pinchStartDistance;
+  Size? _pinchStartSize;
 
   @override
   void initState() {
     super.initState();
+    widget.ctrl.initSize(widget.screenSize);
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -101,47 +105,152 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     super.dispose();
   }
 
+  /// Returns true if [globalPosition] is inside the bottom control bar.
+  bool _isInControlBar(Offset globalPosition) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return false;
+    final local = box.globalToLocal(globalPosition);
+    return local.dy > box.size.height - _controlBarHeight;
+  }
+
+  void _handlePointerLift() {
+    _pinchStartDistance = null;
+    _pinchStartSize = null;
+    _dragCommitted = false;
+
+    if (_activePointers.length == 1) {
+      // Continue dragging with the remaining finger from its current position,
+      // unless that finger is inside the control bar.
+      final remaining = _activePointers.entries.first;
+      if (_isInControlBar(remaining.value)) {
+        _dragPointerStart = null;
+        _dragStartPos = null;
+      } else {
+        _dragPointerStart = remaining.value;
+        _dragStartPos = widget.ctrl.position.value;
+      }
+    } else {
+      _dragPointerStart = null;
+      _dragStartPos = null;
+    }
+  }
+
   void _onTap() {
     final ctrl = widget.ctrl;
     final plCtr = widget.plCtr;
-    debugPrint('[MiniPlayer] _onTap start, bvid=${plCtr.bvid}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
-    // Read bvid/cid BEFORE dispose clears them.
-    final bvid = plCtr.bvid;
+    if (kDebugMode) {
+      debugPrint(
+          '[MiniPlayer] _onTap start, bvid=${plCtr.bvidOrNull}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
+    }
+    // Read bvid/cid BEFORE any dispose clears them.
+    final bvid = plCtr.bvidOrNull;
     // cid is int? — provide a fallback so RxInt(args['cid']) doesn't crash
     final cid = plCtr.cid ?? 0;
-    debugPrint('[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid');
-    // ctrl.markTapToExpand();  // removed — no longer needed
-    // Step 1: hide mini-player — this removes its SimpleVideo from the
-    // widget tree at the end of the current frame.
-    ctrl.hide();
-    // Step 2: wait 1 frame for the mini-player to fully unmount, THEN
-    // dispose the player and navigate to a fresh video page.
-    // This avoids two SimpleVideo widgets bound to the same VideoController
-    // coexisting, which causes a media-kit crash.
+    if (bvid == null || bvid.isEmpty || cid == 0) {
+      if (kDebugMode) {
+        debugPrint('[MiniPlayer] _onTap: invalid bvid/cid, hiding instead');
+      }
+      ctrl.hide();
+      return;
+    }
+    final aid = plCtr.aid;
+    final videoType = plCtr.videoType;
+    final epid = plCtr.epid;
+    final seasonId = plCtr.seasonId;
+    final pgcType = plCtr.pgcType;
+    if (kDebugMode) {
+      debugPrint(
+          '[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid, aid=$aid, videoType=$videoType, epid=$epid, seasonId=$seasonId, pgcType=$pgcType');
+    }
+    // Notify the video page that it is being restored from the mini-player,
+    // so didPopNext() skips playerInit() and just re-enables the video surface.
+    // Hide mini-player — this removes its SimpleVideo from the widget tree at
+    // the end of the current frame.
+    ctrl
+      ..markReturningFromMiniPlayer()
+      ..hide();
+    // Wait 1 frame (plus a small safety margin) for the mini-player's
+    // SimpleVideo to be fully released, then either pop back to the existing
+    // video page or open a fresh one if the video page is no longer in stack.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 50), () {
-        debugPrint('[MiniPlayer] delayed callback firing');
+        if (kDebugMode) {
+          debugPrint('[MiniPlayer] delayed callback firing');
+        }
+        var foundVideoRoute = false;
         try {
-          debugPrint('[MiniPlayer] calling plCtr.dispose()');
-          plCtr.dispose();
-          debugPrint('[MiniPlayer] plCtr.dispose() returned');
+          final nav = Get.key.currentState;
+          if (nav != null) {
+            nav.popUntil((route) {
+              if (route.settings.name == '/videoV') {
+                foundVideoRoute = true;
+                return true;
+              }
+              // Stop at the root route so we never pop the whole stack away.
+              if (route.isFirst) {
+                return true;
+              }
+              return false;
+            });
+          }
         } catch (e, s) {
-          debugPrint('[MiniPlayer] ERROR in plCtr.dispose(): $e\n$s');
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] ERROR in popUntil: $e\n$s');
+          }
+        }
+
+        if (foundVideoRoute) {
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] popped back to existing /videoV route');
+          }
+          return;
+        }
+
+        // No existing video page in the stack (e.g. the user minimized the
+        // player with the in-page minimize button). Dispose the player safely
+        // — no other SimpleVideo is bound to it — and open a fresh video page.
+        ctrl.clearReturningFromMiniPlayer();
+        if (kDebugMode) {
+          debugPrint(
+              '[MiniPlayer] no existing /videoV route; disposing player and opening fresh page');
         }
         try {
-          debugPrint('[MiniPlayer] calling Get.offNamed to /videoV');
-          Get.offNamed(
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] calling plCtr.dispose()');
+          }
+          plCtr.dispose();
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] plCtr.dispose() returned');
+          }
+        } catch (e, s) {
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] ERROR in plCtr.dispose(): $e\n$s');
+          }
+        }
+        try {
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] calling Get.toNamed to /videoV');
+          }
+          Get.toNamed(
             '/videoV',
             arguments: {
               'bvid': bvid,
               'cid': cid,
+              'aid': ?aid,
               'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
-              'videoType': VideoType.ugc,
+              'videoType': videoType,
+              'epId': ?epid,
+              'seasonId': ?seasonId,
+              'pgcType': ?pgcType,
             },
           );
-          debugPrint('[MiniPlayer] Get.offNamed returned');
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] Get.toNamed returned');
+          }
         } catch (e, s) {
-          debugPrint('[MiniPlayer] ERROR in Get.offNamed: $e\n$s');
+          if (kDebugMode) {
+            debugPrint('[MiniPlayer] ERROR in Get.toNamed: $e\n$s');
+          }
         }
       });
     });
@@ -171,26 +280,98 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               else
                 Container(color: Colors.black),
 
-              // Tap-to-expand (GestureDetector catches taps on video area)
-              // Must be BELOW controls in Stack order so buttons work
-              Positioned.fill(
+              // Tap-to-expand (GestureDetector catches taps on video area only)
+              // Must be BELOW controls in Stack order so buttons work.
+              // It stops above the bottom control bar so taps there don't expand.
+              Positioned(
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: _controlBarHeight,
                 child: GestureDetector(
                   onTap: _onTap,
                   behavior: HitTestBehavior.translucent,
                 ),
               ),
 
-              // Drag listener — raw pointer events, no gesture arena conflict
+              // Drag + pinch listener — raw pointer events, no gesture arena conflict
               Positioned.fill(
                 child: Listener(
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (event) {
-                    _dragStartPos = widget.ctrl.position.value;
-                    _dragPointerStart = event.position;
+                    if (_activePointers.length >= 2) return;
+                    if (_activePointers.length == 1) {
+                      // Potential second pointer — ignore it if it starts in the control bar.
+                      if (_isInControlBar(event.position)) {
+                        return;
+                      }
+                    }
+                    _activePointers[event.pointer] = event.position;
+                    final ctrl = widget.ctrl;
+
+                    if (_activePointers.length == 1) {
+                      if (_isInControlBar(event.position)) {
+                        // Ignore drags that start on the control bar so seeking/buttons work.
+                        _dragPointerStart = null;
+                        _dragStartPos = null;
+                        _dragCommitted = false;
+                      } else {
+                        _dragStartPos = ctrl.position.value;
+                        _dragPointerStart = event.position;
+                        _dragCommitted = false;
+                      }
+                    } else if (_activePointers.length == 2) {
+                      // Second finger: switch from drag to pinch only if both
+                      // fingers are outside the bottom control bar.
+                      final positions = _activePointers.values.toList();
+                      if (_isInControlBar(positions[0]) ||
+                          _isInControlBar(positions[1])) {
+                        return;
+                      }
+                      _dragStartPos = null;
+                      _dragPointerStart = null;
+                      _dragCommitted = false;
+                      _pinchStartDistance =
+                          (positions[0] - positions[1]).distance;
+                      _pinchStartSize = ctrl.size.value;
+                    }
                   },
                   onPointerMove: (event) {
-                    if (_dragStartPos != null && _dragPointerStart != null) {
-                      final ctrl = widget.ctrl;
+                    if (!_activePointers.containsKey(event.pointer)) {
+                      return;
+                    }
+                    _activePointers[event.pointer] = event.position;
+                    final ctrl = widget.ctrl;
+
+                    if (_activePointers.length == 2 &&
+                        _pinchStartDistance != null &&
+                        _pinchStartSize != null) {
+                      final newSize = computePinchSize(
+                        pointers: _activePointers,
+                        startDistance: _pinchStartDistance!,
+                        startSize: _pinchStartSize!,
+                        screenSize: widget.screenSize,
+                      );
+                      ctrl
+                        ..updateSize(newSize)
+                        ..updatePosition(
+                          ctrl.clampPosition(
+                            ctrl.position.value,
+                            newSize,
+                            widget.screenSize,
+                          ),
+                        );
+                    } else if (_activePointers.length == 1 &&
+                        _dragStartPos != null &&
+                        _dragPointerStart != null) {
+                      if (!_dragCommitted) {
+                        final distance =
+                            (event.position - _dragPointerStart!).distance;
+                        if (distance < kTouchSlop) {
+                          return;
+                        }
+                        _dragCommitted = true;
+                      }
                       final delta = event.position - _dragPointerStart!;
                       final newPos = ctrl.clampPosition(
                         Offset(
@@ -204,12 +385,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     }
                   },
                   onPointerUp: (event) {
-                    _dragStartPos = null;
-                    _dragPointerStart = null;
+                    _activePointers.remove(event.pointer);
+                    _handlePointerLift();
                   },
                   onPointerCancel: (event) {
-                    _dragStartPos = null;
-                    _dragPointerStart = null;
+                    _activePointers.remove(event.pointer);
+                    _handlePointerLift();
                   },
                 ),
               ),
@@ -220,7 +401,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  height: 40,
+                  height: _controlBarHeight,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -237,7 +418,9 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                         icon: Obx(() {
                           final isPlaying = plCtr.playerStatus.isPlaying;
                           return Icon(
-                            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
                             size: 20,
                             color: Colors.white,
                           );
@@ -270,62 +453,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                         }),
                       ),
                       _ControlButton(
-                        icon: const Icon(Icons.close_rounded, size: 20, color: Colors.white),
+                        icon: const Icon(Icons.close_rounded,
+                            size: 20, color: Colors.white),
                         onTap: widget.ctrl.close,
                       ),
                     ],
-                  ),
-                ),
-              ),
-
-              // Resize handle — positioned ABOVE the control bar
-              // Uses Listener (raw pointer events) instead of GestureDetector
-              // to avoid gesture arena conflict with SimpleVideo.
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 2, bottom: 42),
-                  child: Listener(
-                    behavior: HitTestBehavior.translucent,
-                    onPointerDown: (event) {
-                      _resizePointerStart = event.position;
-                      _resizeStartSize = widget.ctrl.size.value;
-                    },
-                    onPointerMove: (event) {
-                      if (_resizePointerStart == null || _resizeStartSize == null) return;
-                      final ctrl = widget.ctrl;
-                      final delta = event.position - _resizePointerStart!;
-                      final newWidth = (_resizeStartSize!.width + delta.dx)
-                          .clamp(120.0, widget.screenSize.width * 0.85);
-                      final aspect = _resizeStartSize!.width / _resizeStartSize!.height;
-                      ctrl.updateSize(Size(newWidth, newWidth / aspect));
-                    },
-                    onPointerUp: (_) {
-                      _resizePointerStart = null;
-                      _resizeStartSize = null;
-                    },
-                    onPointerCancel: (_) {
-                      _resizePointerStart = null;
-                      _resizeStartSize = null;
-                    },
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(8),
-                          bottomRight: Radius.circular(12),
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.fit_screen_rounded,
-                        size: 18,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
                   ),
                 ),
               ),
