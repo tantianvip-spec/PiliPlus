@@ -10,8 +10,8 @@ import 'package:flutter/material.dart';
 /// the width to `[120, screenWidth * 0.85]`.
 ///
 /// Returns [startSize] when the input is invalid (not exactly two pointers,
-/// zero or negative [startDistance], zero current pointer distance, or a
-/// zero-area [startSize]).
+/// zero or negative [startDistance], zero current pointer distance, a
+/// zero-area [startSize], or any non-finite numeric value).
 Size computePinchSize({
   required Map<int, Offset> pointers,
   required double startDistance,
