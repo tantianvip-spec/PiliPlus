@@ -237,6 +237,14 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
           child: Stack(
             fit: StackFit.expand,
             children: [
+              // Block pointer events from reaching the page behind the mini-player.
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  child: SizedBox.expand(),
+                ),
+              ),
+
               // Video content
               if (plCtr.videoController != null)
                 SimpleVideo(
@@ -261,6 +269,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (event) {
                     if (_activePointers.length >= 2) return;
+                    if (_activePointers.length == 1) {
+                      // Potential second pointer — ignore it if it starts in the control bar.
+                      if (_isInControlBar(event.position)) {
+                        return;
+                      }
+                    }
                     _activePointers[event.pointer] = event.position;
                     final ctrl = widget.ctrl;
 

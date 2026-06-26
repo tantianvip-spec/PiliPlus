@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/scheduler.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:get/get.dart';
 
@@ -50,7 +51,9 @@ class MiniPlayerController extends GetxController {
   void close() {
     debugPrint('[MiniPlayer] close() called');
     hide();
-    PlPlayerController.instance?.dispose();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      PlPlayerController.instance?.dispose();
+    });
   }
 
   /// Update the drag position.
