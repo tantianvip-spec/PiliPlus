@@ -15,7 +15,12 @@ import 'package:get/get.dart';
 /// or manually (via the minimize button in player controls).
 /// Auto-hide is handled by the video page's RouteAware lifecycle.
 class MiniPlayerController extends GetxController {
-  static MiniPlayerController get instance => Get.find<MiniPlayerController>();
+  static MiniPlayerController get instance {
+    if (!Get.isRegistered<MiniPlayerController>()) {
+      Get.put(MiniPlayerController());
+    }
+    return Get.find<MiniPlayerController>();
+  }
 
   /// Whether the mini-player is currently visible.
   final RxBool isVisible = false.obs;

@@ -907,7 +907,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
         ),
         onTap: () {
           MiniPlayerController.instance.show();
-          Get.back();
+          // Pop back to the root (main) route so the overlay mini-player
+          // becomes visible. Using Get.back() alone only pops one route and
+          // may leave us on a search/member page that has no mini-player overlay.
+          Get.until((route) => route.isFirst);
         },
       ),
     };
