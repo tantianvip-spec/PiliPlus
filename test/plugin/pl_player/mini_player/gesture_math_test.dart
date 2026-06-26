@@ -136,5 +136,37 @@ void main() {
         const Size(400, 300),
       );
     });
+
+    test('returns start size for non-finite startDistance', () {
+      const pointers = <int, Offset>{
+        1: Offset(100, 100),
+        2: Offset(200, 100),
+      };
+      expect(
+        computePinchSize(
+          pointers: pointers,
+          startDistance: double.nan,
+          startSize: startSize,
+          screenSize: screenSize,
+        ),
+        startSize,
+      );
+    });
+
+    test('returns start size for zero-area startSize', () {
+      const pointers = <int, Offset>{
+        1: Offset(100, 100),
+        2: Offset(200, 100),
+      };
+      expect(
+        computePinchSize(
+          pointers: pointers,
+          startDistance: 100,
+          startSize: Size.zero,
+          screenSize: screenSize,
+        ),
+        Size.zero,
+      );
+    });
   });
 }

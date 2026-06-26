@@ -27,6 +27,14 @@ Size computePinchSize({
   if (currentDistance <= 0 || startSize.width <= 0 || startSize.height <= 0) {
     return startSize;
   }
+  if (!startDistance.isFinite ||
+      !currentDistance.isFinite ||
+      !screenSize.width.isFinite ||
+      !screenSize.height.isFinite ||
+      !startSize.width.isFinite ||
+      !startSize.height.isFinite) {
+    return startSize;
+  }
 
   final ratio = currentDistance / startDistance;
   const double minWidth = 120.0;
