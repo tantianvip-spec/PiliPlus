@@ -73,6 +73,22 @@ void main() {
       );
     });
 
+    test('narrow screen clamps to minWidth without crashing', () {
+      const pointers = <int, Offset>{
+        1: const Offset(50, 100),
+        2: const Offset(250, 100),
+      };
+      expect(
+        computePinchSize(
+          pointers: pointers,
+          startDistance: 100,
+          startSize: startSize,
+          screenSize: const Size(100, 100),
+        ),
+        const Size(minWidth, minWidth * 9 / 16),
+      );
+    });
+
     test('returns start size with fewer than two pointers', () {
       const pointers = <int, Offset>{
         1: Offset(100, 100),

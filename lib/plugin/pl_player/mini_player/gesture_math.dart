@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Compute the new mini-player size from a two-finger pinch gesture.
@@ -7,7 +9,7 @@ import 'package:flutter/material.dart';
 /// is the mini-player size at that moment. [screenSize] is used to clamp
 /// the width to `[120, screenWidth * 0.85]`.
 ///
-/// Returns [startSize] when the input is invalid (fewer than two pointers,
+/// Returns [startSize] when the input is invalid (not exactly two pointers,
 /// zero or negative [startDistance], zero current pointer distance, or a
 /// zero-area [startSize]).
 Size computePinchSize({
@@ -28,7 +30,8 @@ Size computePinchSize({
 
   final ratio = currentDistance / startDistance;
   const double minWidth = 120.0;
-  final double maxWidth = screenSize.width * 0.85;
+  const double maxWidthFactor = 0.85;
+  final double maxWidth = math.max(minWidth, screenSize.width * maxWidthFactor);
   final newWidth = (startSize.width * ratio).clamp(minWidth, maxWidth);
   final aspect = startSize.width / startSize.height;
   return Size(newWidth, newWidth / aspect);
