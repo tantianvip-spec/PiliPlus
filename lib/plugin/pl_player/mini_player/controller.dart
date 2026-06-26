@@ -95,6 +95,20 @@ class MiniPlayerController extends GetxController {
     size.value = defaultSizeFor(screenSize);
   }
 
+  /// Apply a preset size by [widthFactor] (relative to screen width) and keep
+  /// the mini-player within screen bounds.
+  void applyPreset(Size screenSize, double widthFactor) {
+    final newSize = clampSize(
+      Size(
+        screenSize.width * widthFactor,
+        screenSize.width * widthFactor * 9 / 16,
+      ),
+      screenSize,
+    );
+    size.value = newSize;
+    position.value = clampPosition(position.value, newSize, screenSize);
+  }
+
   /// Clamp position so the mini-player stays within screen bounds.
   Offset clampPosition(Offset pos, Size playerSize, Size screenSize) {
     return Offset(

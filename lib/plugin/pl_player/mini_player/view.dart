@@ -471,6 +471,38 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                           );
                         }),
                       ),
+                      SizedBox(
+                        width: 44,
+                        height: _controlBarHeight,
+                        child: PopupMenuButton<double>(
+                          tooltip: '窗口大小',
+                          position: PopupMenuPosition.over,
+                          icon: const Icon(
+                            Icons.aspect_ratio,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                          color: Colors.black.withValues(alpha: 0.9),
+                          padding: EdgeInsets.zero,
+                          onSelected: (factor) {
+                            widget.ctrl.applyPreset(widget.screenSize, factor);
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                                value: 0.30,
+                                child: Text('小', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(
+                                value: 0.45,
+                                child: Text('中', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(
+                                value: 0.60,
+                                child: Text('大', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(
+                                value: 0.80,
+                                child: Text('铺满', style: TextStyle(color: Colors.white))),
+                          ],
+                        ),
+                      ),
                       _ControlButton(
                         icon: const Icon(Icons.close_rounded,
                             size: 20, color: Colors.white),
