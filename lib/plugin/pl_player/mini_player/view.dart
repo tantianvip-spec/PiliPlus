@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
@@ -76,6 +78,9 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   double? _pinchStartDistance;
   Size? _pinchStartSize;
 
+  // Dispose-safe tap action timer.
+  Timer? _tapActionTimer;
+
   @override
   void initState() {
     super.initState();
@@ -100,6 +105,9 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
   @override
   void dispose() {
+    _tapActionTimer?.cancel();
+    _tapActionTimer = null;
+    widget.ctrl.clearReturningFromMiniPlayer();
     _animController.dispose();
     super.dispose();
   }
@@ -172,7 +180,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     // SimpleVideo to be fully released, then either pop back to the existing
     // video page or open a fresh one if the video page is no longer in stack.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 50), () {
+      if (!mounted) return;
+      _tapActionTimer = Timer(const Duration(milliseconds: 50), () {
+        if (!mounted) {
+          return;
+        }
         if (kDebugMode) {
           debugPrint('[MiniPlayer] delayed callback firing');
         }
@@ -401,64 +413,68 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: Container(
-                  height: _controlBarHeight,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.7),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {},
+                  child: Container(
+                    height: _controlBarHeight,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.7),
+                        ],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        _ControlButton(
+                          icon: Obx(() {
+                            final isPlaying = plCtr.playerStatus.isPlaying;
+                            return Icon(
+                              isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              size: 20,
+                              color: Colors.white,
+                            );
+                          }),
+                          onTap: () {
+                            if (plCtr.playerStatus.isPlaying) {
+                              plCtr.pause();
+                            } else {
+                              plCtr.play();
+                            }
+                          },
+                        ),
+                        Expanded(
+                          child: Obx(() {
+                            final position = plCtr.positionSeconds.value;
+                            final duration = plCtr.duration.value.inSeconds;
+                            return ProgressBar(
+                              progress: Duration(seconds: position),
+                              total: Duration(seconds: duration),
+                              barHeight: 3,
+                              baseBarColor: const Color(0x33FFFFFF),
+                              progressBarColor: Colors.white,
+                              bufferedBarColor: const Color(0x55FFFFFF),
+                              thumbRadius: 0,
+                              thumbColor: Colors.white,
+                              thumbGlowColor: Colors.white,
+                              thumbGlowRadius: 0,
+                              onSeek: plCtr.seekTo,
+                            );
+                          }),
+                        ),
+                        _ControlButton(
+                          icon: const Icon(Icons.close_rounded,
+                              size: 20, color: Colors.white),
+                          onTap: widget.ctrl.close,
+                        ),
                       ],
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      _ControlButton(
-                        icon: Obx(() {
-                          final isPlaying = plCtr.playerStatus.isPlaying;
-                          return Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            size: 20,
-                            color: Colors.white,
-                          );
-                        }),
-                        onTap: () {
-                          if (plCtr.playerStatus.isPlaying) {
-                            plCtr.pause();
-                          } else {
-                            plCtr.play();
-                          }
-                        },
-                      ),
-                      Expanded(
-                        child: Obx(() {
-                          final position = plCtr.positionSeconds.value;
-                          final duration = plCtr.duration.value.inSeconds;
-                          return ProgressBar(
-                            progress: Duration(seconds: position),
-                            total: Duration(seconds: duration),
-                            barHeight: 3,
-                            baseBarColor: const Color(0x33FFFFFF),
-                            progressBarColor: Colors.white,
-                            bufferedBarColor: const Color(0x55FFFFFF),
-                            thumbRadius: 0,
-                            thumbColor: Colors.white,
-                            thumbGlowColor: Colors.white,
-                            thumbGlowRadius: 0,
-                            onSeek: plCtr.seekTo,
-                          );
-                        }),
-                      ),
-                      _ControlButton(
-                        icon: const Icon(Icons.close_rounded,
-                            size: 20, color: Colors.white),
-                        onTap: widget.ctrl.close,
-                      ),
-                    ],
                   ),
                 ),
               ),
