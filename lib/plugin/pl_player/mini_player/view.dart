@@ -76,7 +76,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   double? _pinchStartDistance;
   Size? _pinchStartSize;
 
-
   @override
   void initState() {
     super.initState();
@@ -280,9 +279,14 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               else
                 Container(color: Colors.black),
 
-              // Tap-to-expand (GestureDetector catches taps on video area)
-              // Must be BELOW controls in Stack order so buttons work
-              Positioned.fill(
+              // Tap-to-expand (GestureDetector catches taps on video area only)
+              // Must be BELOW controls in Stack order so buttons work.
+              // It stops above the bottom control bar so taps there don't expand.
+              Positioned(
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: _controlBarHeight,
                 child: GestureDetector(
                   onTap: _onTap,
                   behavior: HitTestBehavior.translucent,
@@ -395,66 +399,63 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  color: Colors.transparent,
-                  child: Container(
-                    height: _controlBarHeight,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        _ControlButton(
-                          icon: Obx(() {
-                            final isPlaying = plCtr.playerStatus.isPlaying;
-                            return Icon(
-                              isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              size: 20,
-                              color: Colors.white,
-                            );
-                          }),
-                          onTap: () {
-                            if (plCtr.playerStatus.isPlaying) {
-                              plCtr.pause();
-                            } else {
-                              plCtr.play();
-                            }
-                          },
-                        ),
-                        Expanded(
-                          child: Obx(() {
-                            final position = plCtr.positionSeconds.value;
-                            final duration = plCtr.duration.value.inSeconds;
-                            return ProgressBar(
-                              progress: Duration(seconds: position),
-                              total: Duration(seconds: duration),
-                              barHeight: 3,
-                              baseBarColor: const Color(0x33FFFFFF),
-                              progressBarColor: Colors.white,
-                              bufferedBarColor: const Color(0x55FFFFFF),
-                              thumbRadius: 0,
-                              thumbColor: Colors.white,
-                              thumbGlowColor: Colors.white,
-                              thumbGlowRadius: 0,
-                              onSeek: plCtr.seekTo,
-                            );
-                          }),
-                        ),
-                        _ControlButton(
-                          icon: const Icon(Icons.close_rounded,
-                              size: 20, color: Colors.white),
-                          onTap: widget.ctrl.close,
-                        ),
+                  height: _controlBarHeight,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.7),
                       ],
                     ),
+                  ),
+                  child: Row(
+                    children: [
+                      _ControlButton(
+                        icon: Obx(() {
+                          final isPlaying = plCtr.playerStatus.isPlaying;
+                          return Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 20,
+                            color: Colors.white,
+                          );
+                        }),
+                        onTap: () {
+                          if (plCtr.playerStatus.isPlaying) {
+                            plCtr.pause();
+                          } else {
+                            plCtr.play();
+                          }
+                        },
+                      ),
+                      Expanded(
+                        child: Obx(() {
+                          final position = plCtr.positionSeconds.value;
+                          final duration = plCtr.duration.value.inSeconds;
+                          return ProgressBar(
+                            progress: Duration(seconds: position),
+                            total: Duration(seconds: duration),
+                            barHeight: 3,
+                            baseBarColor: const Color(0x33FFFFFF),
+                            progressBarColor: Colors.white,
+                            bufferedBarColor: const Color(0x55FFFFFF),
+                            thumbRadius: 0,
+                            thumbColor: Colors.white,
+                            thumbGlowColor: Colors.white,
+                            thumbGlowRadius: 0,
+                            onSeek: plCtr.seekTo,
+                          );
+                        }),
+                      ),
+                      _ControlButton(
+                        icon: const Icon(Icons.close_rounded,
+                            size: 20, color: Colors.white),
+                        onTap: widget.ctrl.close,
+                      ),
+                    ],
                   ),
                 ),
               ),
