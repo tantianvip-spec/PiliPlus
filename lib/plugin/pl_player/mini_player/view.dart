@@ -70,6 +70,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   // Drag tracking
   Offset? _dragStartPos;
   Offset? _dragPointerStart;
+  bool _dragCommitted = false;
 
   // Pinch tracking
   final Map<int, Offset> _activePointers = {};
@@ -114,6 +115,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   void _handlePointerLift() {
     _pinchStartDistance = null;
     _pinchStartSize = null;
+    _dragCommitted = false;
 
     if (_activePointers.length == 1) {
       // Continue dragging with the remaining finger from its current position.
@@ -135,6 +137,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     final bvid = plCtr.bvid;
     // cid is int? — provide a fallback so RxInt(args['cid']) doesn't crash
     final cid = plCtr.cid ?? 0;
+    if (bvid == null || bvid.isEmpty || cid == 0) {
+      debugPrint('[MiniPlayer] _onTap: invalid bvid/cid, hiding instead');
+      ctrl.hide();
+      return;
+    }
     final aid = plCtr.aid;
     final videoType = plCtr.videoType;
     final epid = plCtr.epid;
@@ -261,6 +268,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     if (_activePointers.length == 1) {
                       _dragStartPos = ctrl.position.value;
                       _dragPointerStart = event.position;
+                      _dragCommitted = false;
                     } else if (_activePointers.length == 2) {
                       // Second finger: switch from drag to pinch only if both
                       // fingers are outside the bottom control bar.
@@ -271,6 +279,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                       }
                       _dragStartPos = null;
                       _dragPointerStart = null;
+                      _dragCommitted = false;
                       _pinchStartDistance =
                           (positions[0] - positions[1]).distance;
                       _pinchStartSize = ctrl.size.value;
@@ -293,9 +302,24 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                         screenSize: widget.screenSize,
                       );
                       ctrl.updateSize(newSize);
+                      ctrl.updatePosition(
+                        ctrl.clampPosition(
+                          ctrl.position.value,
+                          newSize,
+                          widget.screenSize,
+                        ),
+                      );
                     } else if (_activePointers.length == 1 &&
                         _dragStartPos != null &&
                         _dragPointerStart != null) {
+                      if (!_dragCommitted) {
+                        final distance =
+                            (event.position - _dragPointerStart!).distance;
+                        if (distance < kTouchSlop) {
+                          return;
+                        }
+                        _dragCommitted = true;
+                      }
                       final delta = event.position - _dragPointerStart!;
                       final newPos = ctrl.clampPosition(
                         Offset(
