@@ -61,6 +61,8 @@ class _MiniPlayerContent extends StatefulWidget {
 
 class _MiniPlayerContentState extends State<_MiniPlayerContent>
     with SingleTickerProviderStateMixin {
+  static const double _controlBarHeight = 40.0;
+
   late final AnimationController _animController;
   late final Animation<Offset> _slideAnimation;
   late final Animation<double> _fadeAnimation;
@@ -106,7 +108,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     final box = context.findRenderObject() as RenderBox?;
     if (box == null) return false;
     final local = box.globalToLocal(globalPosition);
-    return local.dy > box.size.height - 40;
+    return local.dy > box.size.height - _controlBarHeight;
   }
 
   void _handlePointerLift() {
@@ -133,7 +135,13 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     final bvid = plCtr.bvid;
     // cid is int? — provide a fallback so RxInt(args['cid']) doesn't crash
     final cid = plCtr.cid ?? 0;
-    debugPrint('[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid');
+    final aid = plCtr.aid;
+    final videoType = plCtr.videoType;
+    final epid = plCtr.epid;
+    final seasonId = plCtr.seasonId;
+    final pgcType = plCtr.pgcType;
+    debugPrint(
+        '[MiniPlayer] _onTap captured args: bvid=$bvid, cid=$cid, aid=$aid, videoType=$videoType, epid=$epid, seasonId=$seasonId, pgcType=$pgcType');
     // Notify the video page that it is being restored from the mini-player,
     // so didPopNext() skips playerInit() and just re-enables the video surface.
     // Hide mini-player — this removes its SimpleVideo from the widget tree at
@@ -192,12 +200,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
             arguments: {
               'bvid': bvid,
               'cid': cid,
-              if (plCtr.aid != null) 'aid': plCtr.aid,
+              if (aid != null) 'aid': aid,
               'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
-              'videoType': plCtr.videoType,
-              if (plCtr.epid != null) 'epId': plCtr.epid,
-              if (plCtr.seasonId != null) 'seasonId': plCtr.seasonId,
-              if (plCtr.pgcType != null) 'pgcType': plCtr.pgcType,
+              'videoType': videoType,
+              if (epid != null) 'epId': epid,
+              if (seasonId != null) 'seasonId': seasonId,
+              if (pgcType != null) 'pgcType': pgcType,
             },
           );
           debugPrint('[MiniPlayer] Get.toNamed returned');
@@ -246,6 +254,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 child: Listener(
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (event) {
+                    if (_activePointers.length >= 2) return;
                     _activePointers[event.pointer] = event.position;
                     final ctrl = widget.ctrl;
 
@@ -316,7 +325,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 right: 0,
                 bottom: 0,
                 child: Container(
-                  height: 40,
+                  height: _controlBarHeight,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -376,8 +385,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                   ),
                 ),
               ),
-
-
             ],
           ),
         ),
