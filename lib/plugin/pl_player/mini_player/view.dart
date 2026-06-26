@@ -236,12 +236,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
             arguments: {
               'bvid': bvid,
               'cid': cid,
-              'aid': aid?,
+              'aid': ?aid,
               'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
               'videoType': videoType,
-              'epId': epid?,
-              'seasonId': seasonId?,
-              'pgcType': pgcType?,
+              'epId': ?epid,
+              'seasonId': ?seasonId,
+              'pgcType': ?pgcType,
             },
           );
           if (kDebugMode) {
