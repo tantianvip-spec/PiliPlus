@@ -101,14 +101,18 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
   void _onTap() {
     final ctrl = widget.ctrl;
-    // 1. Set flag BEFORE hide() so didPopNext can detect tap-to-expand
-    //    even after isVisible is already false.
     ctrl.markTapToExpand();
-    // 2. Hide mini-player immediately to remove its SimpleVideo from
-    //    the widget tree before popUntil triggers didPopNext.
     ctrl.hide();
-    // 3. Navigate back to the video page.
-    Get.key.currentState?.popUntil((route) => route.settings.name == '/videoV');
+    // Wait one frame for the mini-player's SimpleVideo to be fully
+    // removed from the widget tree before navigating back. Without
+    // this delay, popUntil triggers didPopNext which eventually
+    // re-creates PLVideoPlayer/SimpleVideo on the video page — but
+    // the mini-player's SimpleVideo is still in the tree because
+    // Flutter hasn't rebuilt yet. Two SimpleVideo widgets bound to
+    // the same VideoController at once causes a media-kit crash.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.key.currentState?.popUntil((route) => route.settings.name == '/videoV');
+    });
   }
 
   @override
