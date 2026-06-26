@@ -4,6 +4,7 @@ import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/gesture_math.dart';
 import 'package:PiliPlus/plugin/pl_player/models/play_status.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -235,12 +236,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
             arguments: {
               'bvid': bvid,
               'cid': cid,
-              if (aid != null) 'aid': aid,
+              'aid': aid?,
               'heroTag': 'mini_player_${DateTime.now().millisecondsSinceEpoch}',
               'videoType': videoType,
-              if (epid != null) 'epId': epid,
-              if (seasonId != null) 'seasonId': seasonId,
-              if (pgcType != null) 'pgcType': pgcType,
+              'epId': epid?,
+              'seasonId': seasonId?,
+              'pgcType': pgcType?,
             },
           );
           if (kDebugMode) {
@@ -351,14 +352,15 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                         startSize: _pinchStartSize!,
                         screenSize: widget.screenSize,
                       );
-                      ctrl.updateSize(newSize);
-                      ctrl.updatePosition(
-                        ctrl.clampPosition(
-                          ctrl.position.value,
-                          newSize,
-                          widget.screenSize,
-                        ),
-                      );
+                      ctrl
+                        ..updateSize(newSize)
+                        ..updatePosition(
+                          ctrl.clampPosition(
+                            ctrl.position.value,
+                            newSize,
+                            widget.screenSize,
+                          ),
+                        );
                     } else if (_activePointers.length == 1 &&
                         _dragStartPos != null &&
                         _dragPointerStart != null) {
