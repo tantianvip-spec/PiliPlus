@@ -133,7 +133,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     debugPrint(
         '[MiniPlayer] _onTap start, bvid=${plCtr.bvid}, cid=${plCtr.cid}, isVisible=${ctrl.isVisible.value}');
     // Read bvid/cid BEFORE any dispose clears them.
-    final bvid = plCtr.bvid;
+    final bvid = plCtr.bvidOrNull;
     // cid is int? — provide a fallback so RxInt(args['cid']) doesn't crash
     final cid = plCtr.cid ?? 0;
     if (bvid == null || bvid.isEmpty || cid == 0) {
@@ -279,9 +279,16 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     final ctrl = widget.ctrl;
 
                     if (_activePointers.length == 1) {
-                      _dragStartPos = ctrl.position.value;
-                      _dragPointerStart = event.position;
-                      _dragCommitted = false;
+                      if (_isInControlBar(event.position)) {
+                        // Ignore drags that start on the control bar so seeking/buttons work.
+                        _dragPointerStart = null;
+                        _dragStartPos = null;
+                        _dragCommitted = false;
+                      } else {
+                        _dragStartPos = ctrl.position.value;
+                        _dragPointerStart = event.position;
+                        _dragCommitted = false;
+                      }
                     } else if (_activePointers.length == 2) {
                       // Second finger: switch from drag to pinch only if both
                       // fingers are outside the bottom control bar.

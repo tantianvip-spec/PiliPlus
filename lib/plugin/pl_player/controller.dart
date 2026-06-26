@@ -162,6 +162,8 @@ class PlPlayerController with BlockConfigMixin {
 
   int? get aid => _aid;
 
+  String? get bvidOrNull => _bvid;
+
   int? get epid => _epid;
 
   int? get seasonId => _seasonId;
