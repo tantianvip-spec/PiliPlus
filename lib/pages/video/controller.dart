@@ -398,11 +398,9 @@ class VideoDetailController extends GetxController
     cover = RxString(args['cover'] ?? '');
     isVertical = RxBool(args['isVertical'] ?? false);
 
-    // Restore playback state when returning from the mini-player and the
-    // original video page is no longer in the route stack.
-    if (args['seekTo'] is int) {
-      playedTime = Duration(milliseconds: args['seekTo'] as int);
-    }
+    // Restore play/pause state when returning from the mini-player and the
+    // original video page is no longer in the route stack. Progress is carried
+    // via the existing 'progress' argument and applied by queryVideoUrl().
     _autoPlay.value = args['autoPlay'] ?? Pref.autoPlayEnable;
 
     sourceType = args['sourceType'] ?? SourceType.normal;

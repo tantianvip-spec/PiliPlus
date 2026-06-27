@@ -255,7 +255,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               'epId': ?epid,
               'seasonId': ?seasonId,
               'pgcType': ?pgcType,
-              'seekTo': seekTo,
+              'progress': seekTo,
               'autoPlay': wasPlaying,
             },
           );
