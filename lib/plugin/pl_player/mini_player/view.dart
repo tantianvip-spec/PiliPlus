@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:PiliPlus/common/widgets/progress_bar/audio_video_progress_bar.dart';
 import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/plugin/pl_player/mini_player/controller.dart';
@@ -17,21 +19,24 @@ class MiniPlayerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = MiniPlayerController.instance;
     final screenSize = MediaQuery.sizeOf(context);
-    final fallbackSize = ctrl.defaultSizeFor(screenSize);
-
-    // Defer the controller-side size mutation to avoid calling setState
-    // during the initial build of the Obx/Positioned widget.
-    if (ctrl.size.value == Size.zero) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ctrl.initSize(screenSize);
-      });
-    }
 
     return Obx(() {
       if (!ctrl.isVisible.value) return const SizedBox.shrink();
 
       final plCtr = PlPlayerController.instance;
       if (plCtr == null) return const SizedBox.shrink();
+
+      final aspectRatio = _computeAspectRatio(plCtr);
+      final fallbackSize =
+          ctrl.defaultSizeFor(screenSize, aspectRatio: aspectRatio);
+
+      // Defer the controller-side size mutation to avoid calling setState
+      // during the initial build of the Obx/Positioned widget.
+      if (ctrl.size.value == Size.zero) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ctrl.initSize(screenSize, aspectRatio: aspectRatio);
+        });
+      }
 
       final offset = ctrl.position.value;
       final right = offset.dx;
@@ -51,6 +56,15 @@ class MiniPlayerWidget extends StatelessWidget {
         ),
       );
     });
+  }
+
+  double _computeAspectRatio(PlPlayerController plCtr) {
+    final w = plCtr.width;
+    final h = plCtr.height;
+    if (w != null && h != null && h != 0) {
+      return w / h;
+    }
+    return 16 / 9;
   }
 }
 
@@ -87,6 +101,20 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   double? _pinchStartDistance;
   Size? _pinchStartSize;
 
+  // Control bar auto-hide
+  bool _showControls = true;
+  bool _suppressNextExpand = false;
+  Timer? _controlsTimer;
+
+  double get _aspectRatio {
+    final w = widget.plCtr.width;
+    final h = widget.plCtr.height;
+    if (w != null && h != null && h != 0) {
+      return w / h;
+    }
+    return 16 / 9;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -106,12 +134,31 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
       curve: Curves.easeOut,
     ));
     _animController.forward();
+    _scheduleControlsHide();
   }
 
   @override
   void dispose() {
+    _controlsTimer?.cancel();
     _animController.dispose();
     super.dispose();
+  }
+
+  void _scheduleControlsHide() {
+    _controlsTimer?.cancel();
+    _controlsTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _revealControls() {
+    if (!_showControls) {
+      setState(() => _showControls = true);
+      _suppressNextExpand = true;
+    }
+    _scheduleControlsHide();
   }
 
   /// Returns true if [globalPosition] is inside the bottom control bar.
@@ -145,6 +192,14 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   }
 
   void _onTap() {
+    // If controls were hidden when the gesture started, the first tap only
+    // reveals them instead of expanding the player.
+    if (_suppressNextExpand) {
+      _suppressNextExpand = false;
+      _revealControls();
+      return;
+    }
+
     final ctrl = widget.ctrl;
     final plCtr = widget.plCtr;
     if (kDebugMode) {
@@ -314,6 +369,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 child: Listener(
                   behavior: HitTestBehavior.translucent,
                   onPointerDown: (event) {
+                    _revealControls();
                     if (_activePointers.length >= 2) return;
                     if (_activePointers.length == 1) {
                       // Potential second pointer — ignore it if it starts in the control bar.
@@ -366,11 +422,16 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     if (_activePointers.length == 2 &&
                         _pinchStartDistance != null &&
                         _pinchStartSize != null) {
-                      final newSize = computePinchSize(
+                      final rawSize = computePinchSize(
                         pointers: _activePointers,
                         startDistance: _pinchStartDistance!,
                         startSize: _pinchStartSize!,
                         screenSize: widget.screenSize,
+                      );
+                      final newSize = ctrl.clampSize(
+                        rawSize,
+                        widget.screenSize,
+                        aspectRatio: _aspectRatio,
                       );
                       if (kDebugMode && newSize != ctrl.size.value) {
                         debugPrint(
@@ -410,10 +471,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                     }
                   },
                   onPointerUp: (event) {
+                    _revealControls();
                     _activePointers.remove(event.pointer);
                     _handlePointerLift();
                   },
                   onPointerCancel: (event) {
+                    _revealControls();
                     _activePointers.remove(event.pointer);
                     _handlePointerLift();
                   },
@@ -425,93 +488,112 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: Container(
-                  height: _controlBarHeight,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.7),
-                      ],
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      _ControlButton(
-                        icon: Obx(() {
-                          final isPlaying = plCtr.playerStatus.isPlaying;
-                          return Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            size: 20,
-                            color: Colors.white,
-                          );
-                        }),
-                        onTap: () {
-                          if (plCtr.playerStatus.isPlaying) {
-                            plCtr.pause();
-                          } else {
-                            plCtr.play();
-                          }
-                        },
-                      ),
-                      Expanded(
-                        child: Obx(() {
-                          final position = plCtr.positionSeconds.value;
-                          final duration = plCtr.duration.value.inSeconds;
-                          return ProgressBar(
-                            progress: Duration(seconds: position),
-                            total: Duration(seconds: duration),
-                            barHeight: 3,
-                            baseBarColor: const Color(0x33FFFFFF),
-                            progressBarColor: Colors.white,
-                            bufferedBarColor: const Color(0x55FFFFFF),
-                            thumbRadius: 0,
-                            thumbColor: Colors.white,
-                            thumbGlowColor: Colors.white,
-                            thumbGlowRadius: 0,
-                            onSeek: plCtr.seekTo,
-                          );
-                        }),
-                      ),
-                      SizedBox(
-                        width: 44,
-                        height: _controlBarHeight,
-                        child: PopupMenuButton<double>(
-                          tooltip: '窗口大小',
-                          position: PopupMenuPosition.over,
-                          icon: const Icon(
-                            Icons.aspect_ratio,
-                            size: 20,
-                            color: Colors.white,
-                          ),
-                          color: Colors.black.withValues(alpha: 0.9),
-                          padding: EdgeInsets.zero,
-                          onSelected: (factor) {
-                            widget.ctrl.applyPreset(widget.screenSize, factor);
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                                value: 0.45,
-                                child: Text('中', style: TextStyle(color: Colors.white))),
-                            const PopupMenuItem(
-                                value: 0.60,
-                                child: Text('大', style: TextStyle(color: Colors.white))),
-                            const PopupMenuItem(
-                                value: 0.80,
-                                child: Text('铺满', style: TextStyle(color: Colors.white))),
+                child: IgnorePointer(
+                  ignoring: !_showControls,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: _showControls ? 1.0 : 0.0,
+                    child: Container(
+                      height: _controlBarHeight,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.7),
                           ],
                         ),
                       ),
-                      _ControlButton(
-                        icon: const Icon(Icons.close_rounded,
-                            size: 20, color: Colors.white),
-                        onTap: widget.ctrl.close,
+                      child: Row(
+                        children: [
+                          _ControlButton(
+                            icon: Obx(() {
+                              final isPlaying = plCtr.playerStatus.isPlaying;
+                              return Icon(
+                                isPlaying
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                size: 20,
+                                color: Colors.white,
+                              );
+                            }),
+                            onTap: () {
+                              _revealControls();
+                              if (plCtr.playerStatus.isPlaying) {
+                                plCtr.pause();
+                              } else {
+                                plCtr.play();
+                              }
+                            },
+                          ),
+                          Expanded(
+                            child: Obx(() {
+                              final position = plCtr.positionSeconds.value;
+                              final duration = plCtr.duration.value.inSeconds;
+                              return ProgressBar(
+                                progress: Duration(seconds: position),
+                                total: Duration(seconds: duration),
+                                barHeight: 3,
+                                baseBarColor: const Color(0x33FFFFFF),
+                                progressBarColor: Colors.white,
+                                bufferedBarColor: const Color(0x55FFFFFF),
+                                thumbRadius: 0,
+                                thumbColor: Colors.white,
+                                thumbGlowColor: Colors.white,
+                                thumbGlowRadius: 0,
+                                onSeek: (value) {
+                                  _revealControls();
+                                  plCtr.seekTo(value);
+                                },
+                              );
+                            }),
+                          ),
+                          SizedBox(
+                            width: 44,
+                            height: _controlBarHeight,
+                            child: PopupMenuButton<double>(
+                              tooltip: '窗口大小',
+                              position: PopupMenuPosition.over,
+                              icon: const Icon(
+                                Icons.aspect_ratio,
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                              color: Colors.black.withValues(alpha: 0.9),
+                              padding: EdgeInsets.zero,
+                              onSelected: (factor) {
+                                _revealControls();
+                                widget.ctrl.applyPreset(
+                                  widget.screenSize,
+                                  factor,
+                                  aspectRatio: _aspectRatio,
+                                );
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                    value: 0.45,
+                                    child: Text('中', style: TextStyle(color: Colors.white))),
+                                const PopupMenuItem(
+                                    value: 0.60,
+                                    child: Text('大', style: TextStyle(color: Colors.white))),
+                                const PopupMenuItem(
+                                    value: 0.80,
+                                    child: Text('铺满', style: TextStyle(color: Colors.white))),
+                              ],
+                            ),
+                          ),
+                          _ControlButton(
+                            icon: const Icon(Icons.close_rounded,
+                                size: 20, color: Colors.white),
+                            onTap: () {
+                              _revealControls();
+                              widget.ctrl.close();
+                            },
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
