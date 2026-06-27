@@ -74,36 +74,49 @@ class MiniPlayerController extends GetxController {
   }
 
   /// Compute the default mini-player size for [screenSize] without mutating state.
-  Size defaultSizeFor(Size screenSize) {
+  Size defaultSizeFor(Size screenSize, {double aspectRatio = 16 / 9}) {
     const double minWidth = 160.0;
     const double widthFactor = 0.45;
-    const double maxFactor = 0.65;
-    final double w = (screenSize.width * widthFactor)
-        .clamp(minWidth, screenSize.width * maxFactor);
-    return Size(w, w * 9 / 16);
+    const double maxHeightFactor = 0.55;
+    double w = screenSize.width * widthFactor;
+    double h = w / aspectRatio;
+    final double maxH = screenSize.height * maxHeightFactor;
+    if (h > maxH) {
+      h = maxH;
+      w = h * aspectRatio;
+    }
+    final double maxW = screenSize.width * 0.8;
+    w = w.clamp(minWidth, maxW);
+    h = w / aspectRatio;
+    return Size(w, h);
   }
 
   /// Initialize size based on screen width on first show.
-  void initSize(Size screenSize) {
+  void initSize(Size screenSize, {double aspectRatio = 16 / 9}) {
     if (size.value == Size.zero) {
-      size.value = defaultSizeFor(screenSize);
+      size.value = defaultSizeFor(screenSize, aspectRatio: aspectRatio);
     }
   }
 
   /// Reset size to default.
-  void resetSize(Size screenSize) {
-    size.value = defaultSizeFor(screenSize);
+  void resetSize(Size screenSize, {double aspectRatio = 16 / 9}) {
+    size.value = defaultSizeFor(screenSize, aspectRatio: aspectRatio);
   }
 
   /// Apply a preset size by [widthFactor] (relative to screen width) and keep
   /// the mini-player within screen bounds.
-  void applyPreset(Size screenSize, double widthFactor) {
+  void applyPreset(
+    Size screenSize,
+    double widthFactor, {
+    double aspectRatio = 16 / 9,
+  }) {
     final newSize = clampSize(
       Size(
         screenSize.width * widthFactor,
-        screenSize.width * widthFactor * 9 / 16,
+        screenSize.width * widthFactor / aspectRatio,
       ),
       screenSize,
+      aspectRatio: aspectRatio,
     );
     size.value = newSize;
     position.value = clampPosition(position.value, newSize, screenSize);
@@ -117,14 +130,29 @@ class MiniPlayerController extends GetxController {
     );
   }
 
-  /// Clamp size within min/max bounds.
-  Size clampSize(Size newSize, Size screenSize) {
+  /// Clamp size within min/max bounds while preserving [aspectRatio].
+  Size clampSize(
+    Size newSize,
+    Size screenSize, {
+    double aspectRatio = 16 / 9,
+  }) {
     const double minW = 120.0;
     final double maxW = screenSize.width * 0.85;
-    const double minH = minW * 9 / 16;
-    final double maxH = maxW * 9 / 16;
-    final double w = newSize.width.clamp(minW, maxW);
-    final double h = newSize.height.clamp(minH, maxH);
+    final double maxH = screenSize.height * 0.65;
+
+    double w = newSize.width.clamp(minW, maxW);
+    double h = w / aspectRatio;
+
+    if (h > maxH) {
+      h = maxH;
+      w = h * aspectRatio;
+      if (w < minW) {
+        w = minW;
+        h = w / aspectRatio;
+      }
+    }
+
     return Size(w, h);
   }
+
 }
