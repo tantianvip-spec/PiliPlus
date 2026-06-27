@@ -39,6 +39,19 @@ class MiniPlayerWidget extends StatelessWidget {
       final fallbackSize =
           ctrl.defaultSizeFor(screenSize, aspectRatio: aspectRatio);
 
+      // If the current size is from a video with a different orientation
+      // (e.g. landscape vs portrait), reset to the default for the new video
+      // so the mini-player always matches the active video's aspect ratio.
+      if (ctrl.size.value != Size.zero) {
+        final currentAspect =
+            ctrl.size.value.width / ctrl.size.value.height;
+        if ((currentAspect > 1) != (aspectRatio > 1)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ctrl.resetSize(screenSize, aspectRatio: aspectRatio);
+          });
+        }
+      }
+
       // Defer the controller-side size mutation to avoid calling setState
       // during the initial build of the Obx/Positioned widget.
       if (ctrl.size.value == Size.zero) {
