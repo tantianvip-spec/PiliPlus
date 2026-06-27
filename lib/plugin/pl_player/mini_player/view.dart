@@ -26,6 +26,10 @@ class MiniPlayerWidget extends StatelessWidget {
       final plCtr = PlPlayerController.instance;
       if (plCtr == null) return const SizedBox.shrink();
 
+      // Rebuild when the player loads a new video so the mini-player picks up
+      // the latest video controller and aspect ratio.
+      plCtr.dataStatus.value;
+
       final aspectRatio = _computeAspectRatio(plCtr);
       final fallbackSize =
           ctrl.defaultSizeFor(screenSize, aspectRatio: aspectRatio);
@@ -61,7 +65,12 @@ class MiniPlayerWidget extends StatelessWidget {
   double _computeAspectRatio(PlPlayerController plCtr) {
     final w = plCtr.width;
     final h = plCtr.height;
-    if (w != null && h != null && h != 0) {
+    if (w != null &&
+        h != null &&
+        w > 0 &&
+        h > 0 &&
+        w.isFinite &&
+        h.isFinite) {
       return w / h;
     }
     return 16 / 9;
@@ -109,7 +118,12 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   double get _aspectRatio {
     final w = widget.plCtr.width;
     final h = widget.plCtr.height;
-    if (w != null && h != null && h != 0) {
+    if (w != null &&
+        h != null &&
+        w > 0 &&
+        h > 0 &&
+        w.isFinite &&
+        h.isFinite) {
       return w / h;
     }
     return 16 / 9;
