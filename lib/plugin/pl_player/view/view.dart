@@ -906,6 +906,9 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
           color: Colors.white,
         ),
         onTap: () {
+          if (kDebugMode) {
+            debugPrint('[PLPlayer] minimize button tapped');
+          }
           MiniPlayerController.instance.show();
           // Pop back to the root (main) route so the overlay mini-player
           // becomes visible. Using Get.back() alone only pops one route and
