@@ -620,13 +620,13 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                               itemBuilder: (context) => [
                                 const PopupMenuItem(
                                     value: 0.45,
-                                    child: Text('中', style: TextStyle(color: Colors.white))),
+                                    child: Text('小', style: TextStyle(color: Colors.white))),
                                 const PopupMenuItem(
                                     value: 0.60,
-                                    child: Text('大', style: TextStyle(color: Colors.white))),
+                                    child: Text('中', style: TextStyle(color: Colors.white))),
                                 const PopupMenuItem(
                                     value: 0.80,
-                                    child: Text('铺满', style: TextStyle(color: Colors.white))),
+                                    child: Text('大', style: TextStyle(color: Colors.white))),
                               ],
                             ),
                           ),
