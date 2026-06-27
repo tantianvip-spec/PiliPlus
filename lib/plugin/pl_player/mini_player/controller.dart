@@ -15,7 +15,12 @@ import 'package:get/get.dart';
 /// or manually (via the minimize button in player controls).
 /// Auto-hide is handled by the video page's RouteAware lifecycle.
 class MiniPlayerController extends GetxController {
-  static MiniPlayerController get instance => Get.find<MiniPlayerController>();
+  static MiniPlayerController get instance {
+    if (!Get.isRegistered<MiniPlayerController>()) {
+      Get.put(MiniPlayerController());
+    }
+    return Get.find<MiniPlayerController>();
+  }
 
   /// Whether the mini-player is currently visible.
   final RxBool isVisible = false.obs;
@@ -68,20 +73,40 @@ class MiniPlayerController extends GetxController {
     size.value = newSize;
   }
 
+  /// Compute the default mini-player size for [screenSize] without mutating state.
+  Size defaultSizeFor(Size screenSize) {
+    const double minWidth = 160.0;
+    const double widthFactor = 0.45;
+    const double maxFactor = 0.65;
+    final double w = (screenSize.width * widthFactor)
+        .clamp(minWidth, screenSize.width * maxFactor);
+    return Size(w, w * 9 / 16);
+  }
+
   /// Initialize size based on screen width on first show.
   void initSize(Size screenSize) {
     if (size.value == Size.zero) {
-      final double w =
-          (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
-      size.value = Size(w, w * 9 / 16);
+      size.value = defaultSizeFor(screenSize);
     }
   }
 
   /// Reset size to default.
   void resetSize(Size screenSize) {
-    final double w =
-        (screenSize.width * 0.35).clamp(120.0, screenSize.width * 0.5);
-    size.value = Size(w, w * 9 / 16);
+    size.value = defaultSizeFor(screenSize);
+  }
+
+  /// Apply a preset size by [widthFactor] (relative to screen width) and keep
+  /// the mini-player within screen bounds.
+  void applyPreset(Size screenSize, double widthFactor) {
+    final newSize = clampSize(
+      Size(
+        screenSize.width * widthFactor,
+        screenSize.width * widthFactor * 9 / 16,
+      ),
+      screenSize,
+    );
+    size.value = newSize;
+    position.value = clampPosition(position.value, newSize, screenSize);
   }
 
   /// Clamp position so the mini-player stays within screen bounds.

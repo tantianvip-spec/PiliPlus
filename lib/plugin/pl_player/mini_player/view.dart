@@ -17,6 +17,15 @@ class MiniPlayerWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = MiniPlayerController.instance;
     final screenSize = MediaQuery.sizeOf(context);
+    final fallbackSize = ctrl.defaultSizeFor(screenSize);
+
+    // Defer the controller-side size mutation to avoid calling setState
+    // during the initial build of the Obx/Positioned widget.
+    if (ctrl.size.value == Size.zero) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ctrl.initSize(screenSize);
+      });
+    }
 
     return Obx(() {
       if (!ctrl.isVisible.value) return const SizedBox.shrink();
@@ -27,7 +36,8 @@ class MiniPlayerWidget extends StatelessWidget {
       final offset = ctrl.position.value;
       final right = offset.dx;
       final bottom = offset.dy;
-      final playerSize = ctrl.size.value;
+      final playerSize =
+          ctrl.size.value == Size.zero ? fallbackSize : ctrl.size.value;
 
       return Positioned(
         right: right,
@@ -80,7 +90,6 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   @override
   void initState() {
     super.initState();
-    widget.ctrl.initSize(widget.screenSize);
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -208,11 +217,15 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
 
         // No existing video page in the stack (e.g. the user minimized the
         // player with the in-page minimize button). Dispose the player safely
-        // — no other SimpleVideo is bound to it — and open a fresh video page.
+        // — no other SimpleVideo is bound to it — and open a fresh video page,
+        // preserving the current play/pause state and playback position.
         ctrl.clearReturningFromMiniPlayer();
+        final wasPlaying = plCtr.playerStatus.isPlaying;
+        final seekTo = plCtr.position.inMilliseconds;
         if (kDebugMode) {
           debugPrint(
               '[MiniPlayer] no existing /videoV route; disposing player and opening fresh page');
+          debugPrint('[MiniPlayer] preserved state: playing=$wasPlaying, seekTo=$seekTo');
         }
         try {
           if (kDebugMode) {
@@ -242,6 +255,8 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
               'epId': ?epid,
               'seasonId': ?seasonId,
               'pgcType': ?pgcType,
+              'progress': seekTo,
+              'autoPlay': wasPlaying,
             },
           );
           if (kDebugMode) {
@@ -334,6 +349,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                       _pinchStartDistance =
                           (positions[0] - positions[1]).distance;
                       _pinchStartSize = ctrl.size.value;
+                      if (kDebugMode) {
+                        debugPrint(
+                          '[MiniPlayer] pinch start: distance=$_pinchStartDistance, startSize=$_pinchStartSize',
+                        );
+                      }
                     }
                   },
                   onPointerMove: (event) {
@@ -352,6 +372,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                         startSize: _pinchStartSize!,
                         screenSize: widget.screenSize,
                       );
+                      if (kDebugMode && newSize != ctrl.size.value) {
+                        debugPrint(
+                          '[MiniPlayer] pinch update: newSize=$newSize',
+                        );
+                      }
                       ctrl
                         ..updateSize(newSize)
                         ..updatePosition(
@@ -451,6 +476,35 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                             onSeek: plCtr.seekTo,
                           );
                         }),
+                      ),
+                      SizedBox(
+                        width: 44,
+                        height: _controlBarHeight,
+                        child: PopupMenuButton<double>(
+                          tooltip: '窗口大小',
+                          position: PopupMenuPosition.over,
+                          icon: const Icon(
+                            Icons.aspect_ratio,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                          color: Colors.black.withValues(alpha: 0.9),
+                          padding: EdgeInsets.zero,
+                          onSelected: (factor) {
+                            widget.ctrl.applyPreset(widget.screenSize, factor);
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                                value: 0.45,
+                                child: Text('中', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(
+                                value: 0.60,
+                                child: Text('大', style: TextStyle(color: Colors.white))),
+                            const PopupMenuItem(
+                                value: 0.80,
+                                child: Text('铺满', style: TextStyle(color: Colors.white))),
+                          ],
+                        ),
                       ),
                       _ControlButton(
                         icon: const Icon(Icons.close_rounded,
