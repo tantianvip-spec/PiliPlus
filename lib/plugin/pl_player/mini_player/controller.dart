@@ -38,6 +38,16 @@ class MiniPlayerController extends GetxController {
   void markReturningFromMiniPlayer() => _returningFromMiniPlayer = true;
   void clearReturningFromMiniPlayer() => _returningFromMiniPlayer = false;
 
+  /// Set while the app is popping multiple routes at once (e.g. the minimize
+  /// button uses Get.until to return to the root route). Intermediate video
+  /// pages that briefly become visible must not hide the mini-player.
+  bool _bulkPopping = false;
+  bool get isBulkPopping => _bulkPopping;
+  void setBulkPopping(bool value) {
+    _bulkPopping = value;
+    debugPrint('[MiniPlayer] setBulkPopping=$value');
+  }
+
   /// Show the mini-player overlay.
   void show() {
     final ctr = PlPlayerController.instance;

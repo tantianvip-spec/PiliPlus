@@ -21,9 +21,14 @@ class MiniPlayerWidget extends StatelessWidget {
     final screenSize = MediaQuery.sizeOf(context);
 
     return Obx(() {
-      if (!ctrl.isVisible.value) return const SizedBox.shrink();
-
+      final visible = ctrl.isVisible.value;
       final plCtr = PlPlayerController.instance;
+      if (kDebugMode) {
+        debugPrint(
+          '[MiniPlayerWidget] build visible=$visible plCtr=${plCtr != null} dataStatus=${plCtr?.dataStatus.value}',
+        );
+      }
+      if (!visible) return const SizedBox.shrink();
       if (plCtr == null) return const SizedBox.shrink();
 
       // Rebuild when the player loads a new video so the mini-player picks up
@@ -47,6 +52,11 @@ class MiniPlayerWidget extends StatelessWidget {
       final bottom = offset.dy;
       final playerSize =
           ctrl.size.value == Size.zero ? fallbackSize : ctrl.size.value;
+      if (kDebugMode) {
+        debugPrint(
+          '[MiniPlayerWidget] size=$playerSize aspect=$aspectRatio',
+        );
+      }
 
       return Positioned(
         right: right,
@@ -149,6 +159,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
     ));
     _animController.forward();
     _scheduleControlsHide();
+    if (kDebugMode) {
+      debugPrint(
+        '[MiniPlayerContent] initState size=${widget.ctrl.size.value} aspect=$_aspectRatio',
+      );
+    }
   }
 
   @override
@@ -343,6 +358,11 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
   @override
   Widget build(BuildContext context) {
     final plCtr = widget.plCtr;
+    if (kDebugMode) {
+      debugPrint(
+        '[MiniPlayerContent] build videoController=${plCtr.videoController != null} showControls=$_showControls',
+      );
+    }
 
     return SlideTransition(
       position: _slideAnimation,

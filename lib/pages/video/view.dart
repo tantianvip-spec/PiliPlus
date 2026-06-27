@@ -423,7 +423,9 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       miniPlayerCtrl.clearReturningFromMiniPlayer();
       debugPrint('[VideoPage] didPopNext: returning from mini-player tap');
     }
-    if (miniPlayerCtrl.isVisible.value) {
+    if (miniPlayerCtrl.isBulkPopping) {
+      debugPrint('[VideoPage] didPopNext: bulk pop in progress, not hiding mini-player');
+    } else if (miniPlayerCtrl.isVisible.value) {
       debugPrint('[VideoPage] didPopNext: hiding mini-player');
       miniPlayerCtrl.hide();
     }
