@@ -318,7 +318,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
         // preserving the current play/pause state and playback position.
         ctrl.clearReturningFromMiniPlayer();
         final wasPlaying = plCtr.playerStatus.isPlaying;
-        final seekTo = plCtr.position.inMilliseconds;
+        final seekTo = plCtr.positionInMilliseconds;
         if (kDebugMode) {
           debugPrint(
               '[MiniPlayer] no existing /videoV route; disposing player and opening fresh page');
@@ -576,8 +576,8 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                           ),
                           Expanded(
                             child: Obx(() {
-                              final position = plCtr.positionSeconds.value;
-                              final duration = plCtr.duration.value.inSeconds;
+                              final position = plCtr.position.value;
+                              final duration = plCtr.duration.value;
                               return ProgressBar(
                                 progress: Duration(seconds: position),
                                 total: Duration(seconds: duration),

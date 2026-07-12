@@ -1,5 +1,5 @@
-import 'dart:async';
-import 'dart:convert';
+import 'dart:async' show Timer, StreamSubscription;
+import 'dart:convert' show jsonDecode;
 import 'dart:math' as math;
 
 import 'package:PiliPlus/common/widgets/dialog/report.dart';
@@ -149,6 +149,27 @@ class LiveRoomController extends GetxController {
     return const SizedBox.shrink();
   });
 
+  StreamSubscription? _sizeSub;
+
+  void _onSizeChanged((int, int) value) {
+    final isVertical = value.$2 > value.$1;
+    isPortrait.value = isVertical;
+    plPlayerController.isVertical = isVertical;
+  }
+
+  void _startSizeSub() {
+    if (isPortrait.value) return;
+    _stopSizeSub();
+    _sizeSub = plPlayerController.videoPlayerController?.stream.size.listen(
+      _onSizeChanged,
+    );
+  }
+
+  void _stopSizeSub() {
+    _sizeSub?.cancel();
+    _sizeSub = null;
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -232,18 +253,19 @@ class LiveRoomController extends GetxController {
     final pref = Pref.liveStream;
     if (pref != null) {
       try {
-        final protocolName = pref[0];
-        final formatName = pref[1];
-        final codecName = pref[2];
-        for (var i in stream.indexed) {
-          if (i.$2.protocolName == protocolName) {
-            streamIndex = i.$1;
-            for (var j in i.$2.format.indexed) {
-              if (j.$2.formatName == formatName) {
-                formatIndex = j.$1;
-                for (var k in j.$2.codec.indexed) {
-                  if (k.$2.codecName == codecName) {
-                    codecIndex = k.$1;
+        final String protocolName = pref[0];
+        final String formatName = pref[1];
+        final String codecName = pref[2];
+        for (var (i, s) in stream.indexed) {
+          if (s.protocolName == protocolName) {
+            streamIndex = i;
+            for (var (j, f) in s.format.indexed) {
+              if (f.formatName == formatName) {
+                formatIndex = j;
+                for (var (k, c) in f.codec.indexed) {
+                  if (c.codecName == codecName) {
+                    codecIndex = k;
+                    return;
                   }
                 }
               }
@@ -282,7 +304,7 @@ class LiveRoomController extends GetxController {
     currentQnDesc.value =
         LiveQuality.fromCode(currentQn)?.desc ?? currentQn.toString();
     videoUrl = VideoUtils.getLiveCdnUrl(item, index: liveUrlIndex);
-    return playerInit();
+    return playerInit()?.whenComplete(_startSizeSub);
   }
 
   Future<void> queryLiveInfoH5() async {
@@ -437,6 +459,7 @@ class LiveRoomController extends GetxController {
 
   @override
   void onClose() {
+    _stopSizeSub();
     closeLiveMsg();
     cancelLikeTimer();
     cancelLiveTimer();
@@ -485,7 +508,7 @@ class LiveRoomController extends GetxController {
 
   void addDm(dynamic msg, [DanmakuContentItem<DanmakuExtra>? item]) {
     if (plPlayerController.showDanmaku) {
-      if (item != null) {
+      if (item != null && plPlayerController.enableShowLiveDanmaku.value) {
         danmakuController?.addDanmaku(item);
       }
       if (autoScroll && !disableAutoScroll.value) {
