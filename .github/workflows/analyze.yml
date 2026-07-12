@@ -57,3 +57,4 @@ jobs:
 
             - name: 分析 mini_player 模块
               run: flutter analyze lib/plugin/pl_player/mini_player/ lib/plugin/pl_player/controller.dart lib/pages/main/view.dart lib/pages/video/view.dart 2>&1
+
