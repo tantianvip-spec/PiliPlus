@@ -579,8 +579,8 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                               final position = plCtr.position.value;
                               final duration = plCtr.duration.value;
                               return ProgressBar(
-                                progress: Duration(seconds: position),
-                                total: Duration(seconds: duration),
+                                progress: position,
+                                total: duration,
                                 barHeight: 3,
                                 baseBarColor: const Color(0x33FFFFFF),
                                 progressBarColor: Colors.white,
@@ -591,7 +591,7 @@ class _MiniPlayerContentState extends State<_MiniPlayerContent>
                                 thumbGlowRadius: 0,
                                 onSeek: (value) {
                                   _revealControls();
-                                  plCtr.seekTo(value);
+                                  plCtr.seekTo(Duration(milliseconds: value));
                                 },
                               );
                             }),
