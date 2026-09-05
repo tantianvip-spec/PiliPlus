@@ -71,7 +71,6 @@ import 'package:easy_debounce/easy_throttle.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart'
     show RenderProxyBox, SemanticsConfiguration;
 import 'package:flutter/services.dart';
@@ -80,6 +79,7 @@ import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
 import 'package:window_manager/window_manager.dart';
@@ -524,15 +524,12 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       BottomControlType.viewPoints => Obx(
         () {
           if (videoDetailController.viewPointList.isNotEmpty) {
-            final show = videoDetailController.showVP.value;
             return ComBtn(
               width: widgetWidth,
               height: 30,
               tooltip: '分段信息',
               icon: DisabledIcon(
-                iconSize: 22,
-                color: Colors.white,
-                disable: !show,
+                disable: !videoDetailController.showVP.value,
                 child: const Icon(
                   CustomIcons.view_headline_rotate_90,
                   size: 22,
@@ -542,11 +539,11 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
               onTap: widget.showViewPoints,
               onLongPress: () {
                 Feedback.forLongPress(context);
-                videoDetailController.showVP.value = !show;
+                videoDetailController.showVP.toggle();
               },
               onSecondaryTap: PlatformUtils.isMobile
                   ? null
-                  : () => videoDetailController.showVP.value = !show,
+                  : () => videoDetailController.showVP.toggle(),
             );
           }
           return const SizedBox.shrink();
@@ -808,11 +805,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             return const SizedBox.shrink();
           }
           final videoFormat = videoInfo.supportFormats!;
-          final totalQaSam = videoFormat.length;
-          final usefulQaSam = videoInfo.dash!.video!
-              .map((i) => i.id)
-              .toSet()
-              .length;
+          final availableQa = videoInfo.dash!.video!.availableVideoQualities;
           return PopupMenuButton<int>(
             tooltip: '画质',
             requestFocus: false,
@@ -820,10 +813,10 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
             color: Colors.black.withValues(alpha: 0.8),
             itemBuilder: (context) {
               return List.generate(
-                totalQaSam,
+                videoFormat.length,
                 (index) {
                   final item = videoFormat[index];
-                  final enabled = index >= totalQaSam - usefulQaSam;
+                  final enabled = availableQa.contains(item.quality);
                   return PopupMenuItem<int>(
                     enabled: enabled,
                     height: 35,
@@ -2091,7 +2084,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   Future<void> screenshotWebp() async {
     final videoInfo = videoDetailController.data;
-    final ids = videoInfo.dash!.video!.map((i) => i.id!).toSet();
+    final ids = videoInfo.dash!.video!.availableVideoQualities;
     final video = videoDetailController.findVideoByQa(ids.min);
 
     VideoQuality qa = video.quality;
@@ -2115,7 +2108,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
     final success =
         await showDialog<bool>(
-          context: Get.context!,
+          context: context,
           builder: (context) => AlertDialog(
             title: const Text('动态截图'),
             content: Column(
